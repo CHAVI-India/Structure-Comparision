@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - DICOM Structure Comparison{% endblock %}
+
+{% block extra_css %}
+<style>
+    .import-section {
+        background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+        border-radius: 1rem;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .directory-select {
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        width: 100%;
+        transition: all 0.3s ease;
+    }
+    
+    .directory-select:focus {
+        border-color: #9333ea;
+        box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
+        outline: none;
+    }
+    
+    .import-btn {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .import-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    }
+    
+    .import-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .import-result {
+        margin-top: 1rem;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        display: none;
+    }
+    
+    .import-result.success {
+        background: #d1fae5;
+        border: 1px solid #10b981;
+        color: #065f46;
+    }
+    
+    .import-result.error {
+        background: #fee2e2;
+        border: 1px solid #ef4444;
+        color: #991b1b;
+    }
+    
+    .browse-btn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    
+    .browse-btn:hover {
+        background: #2563eb;
+        transform: translateY(-1px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <!-- DICOM Import Section -->
+    <div class="container mx-auto px-4 py-8">
+        <div class="import-section max-w-4xl mx-auto">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4 text-center bg-gray-200 p-2">
+                📁 Import DICOM Files
+            </h2>
+            <p class="text-gray-600 text-center mb-6">
+                Select a directory containing DICOM files to import them into the system
+            </p>
+        <div class="grid md:grid-cols-2 gap-4 mb-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Choose Directory:
+            </label>
+            <input type="file" id="browse-btn" class="browse-btn" webkitdirectory multiple>
+        </div>
+        </div>
+            <div class="text-center">
+                <button id="import-btn" class="import-btn">
+                    <span id="btn-text">📥 Import DICOM Files</span>
+                </button>
+            </div>
+            <div id="import-result" class="import-result"></div>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto text-center">
+            <h1 class="text-5xl font-bold text-gray-900 mb-4">
+                DICOM Structure Comparison
+            </h1>
+            <p class="text-xl text-gray-600 mb-8">
+                Compare and evaluate RT structure sets with advanced visualization tools
+            </p>
+            
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="{% url 'patients' %}" 
+                   class="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg">
+                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    View All Patients
+                </a>
+                
+                <a href="{% url 'admin:index' %}" 
+                   class="px-8 py-4 bg-white text-purple-600 font-semibold rounded-lg border-2 border-purple-200 hover:bg-purple-50 transition-all duration-300 transform hover:scale-105">
+                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Admin Panel
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Features Grid -->
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-6xl mx-auto">
+            <div class="grid md:grid-cols-3 gap-8 mb-12">
+                <div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">DICOM Viewer</h3>
+                    <p class="text-gray-600">Advanced visualization tools for viewing and analyzing DICOM images with RT structure overlays</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Quality Rating</h3>
+                    <p class="text-gray-600">Comprehensive rating system for evaluating structure set quality and contour modifications</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Search & Filter</h3>
+                    <p class="text-gray-600">Powerful search capabilities to find and filter patients, studies, and RT structures</p>
+                </div>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="bg-white rounded-xl p-8 shadow-lg">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Quick Overview</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-purple-600 mb-2">📁</div>
+                        <div class="text-sm text-gray-600">Patient Studies</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-blue-600 mb-2">🏥</div>
+                        <div class="text-sm text-gray-600">DICOM Series</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-green-600 mb-2">⭐</div>
+                        <div class="text-sm text-gray-600">Rated Structures</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-orange-600 mb-2">📊</div>
+                        <div class="text-sm text-gray-600">Quality Scores</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+const csrftoken = getCookie('csrftoken');
+document.addEventListener('DOMContentLoaded', (event) => {
+const selectedDirectory = document.getElementById("browse-btn");
+const importBtn = document.getElementById("import-btn");
+const resultBox = document.getElementById("import-result");
+const btnText = document.getElementById("btn-text");
+
+// Show feedback when files are selected
+selectedDirectory.addEventListener("change", () => {
+    if (selectedDirectory.files.length > 0) {
+        const directoryPath = selectedDirectory.files[0].webkitRelativePath.split('/')[0];
+        alert(selectedDirectory.files.length + " files selected from: " + directoryPath);
+    }
+});
+
+importBtn.addEventListener("click", async () => {
+    if (!selectedDirectory.files.length) {
+        alert("Please select a directory first");
+        return;
+    }
+
+    btnText.style.display = "none";
+    importBtn.disabled = true;
+    
+    // Show loading state
+    importBtn.innerHTML = '<span class="loading-spinner"></span> Importing...';
+
+    const formData = new FormData();
+    for (const file of selectedDirectory.files) {
+        console.log("file: ", file);
+        formData.append("files", file);
+    }
+
+    try {
+        const response = await fetch("{% url 'import_dicom' %}", {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrftoken
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // window.location.href = "{% url 'patients' %}";
+            console.log("Response data: ", data);
+            console.log("Import successful");
+        } else {
+            throw new Error(data.error);
+        }
+
+    } catch (err) {
+        resultBox.className = "import-result error";
+        resultBox.innerText = err.message;
+        resultBox.style.display = "block";
+    } finally {
+        // Restore button state
+        importBtn.innerHTML = '<span id="btn-text">📥 Import DICOM Files</span>';
+        btnText.style.display = "inline";
+        importBtn.disabled = false;
+    }
+});
+});
+</script>
+
+{% endblock %}

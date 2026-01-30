@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}RT Structures - {{ series.series_instance_uid }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">RT Structures</h1>
+                <p class="text-gray-600">RT Structure files for series: {{ series.series_instance_uid }}</p>
+            </div>
+            <a href="{% url 'patients' %}" 
+               class="inline-flex items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Patients
+            </a>
+        </div>
+    </div>
+
+    <!-- Series Info -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+                <span class="text-gray-500">Series UID:</span>
+                <span class="text-gray-900 font-medium ml-1">{{ series.series_instance_uid }}</span>
+            </div>
+            <div>
+                <span class="text-gray-500">Description:</span>
+                <span class="text-gray-900 font-medium ml-1">{{ series.series_description|default:"N/A" }}</span>
+            </div>
+            <div>
+                <span class="text-gray-500">Instances:</span>
+                <span class="text-gray-900 font-medium ml-1">{{ series.instance_count|default:"0" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- RT Structures List -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="px-4 py-3 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">RT Structure Files</h2>
+        </div>
+        
+        {% if rt_structures %}
+            <div class="divide-y divide-gray-200">
+                {% for rt_structure in rt_structures %}
+                <div class="px-4 py-4 hover:bg-gray-50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center">
+                                <h3 class="text-sm font-medium text-gray-900">
+                                    {{ rt_structure.deidentified_rt_structure_file_path|default:"RT Structure File" }}
+                                </h3>
+                                {% if rt_structure.date_contour_reviewed %}
+                                    <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Rated
+                                    </span>
+                                {% endif %}
+                            </div>
+                            
+                            {% if rt_structure.assessor_name or rt_structure.overall_rating %}
+                            <div class="mt-1 text-sm text-gray-500">
+                                {% if rt_structure.assessor_name %}
+                                    <span>Assessor: {{ rt_structure.assessor_name }}</span>
+                                {% endif %}
+                                {% if rt_structure.overall_rating %}
+                                    <span class="ml-3">Rating: {{ rt_structure.overall_rating }}/10</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <a href="{% url 'dicom_viewer' series.series_instance_uid rt_structure.id %}" 
+                               class="inline-flex items-center px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 transition-colors">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                                View
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="px-4 py-8 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No RT structures found</h3>
+                <p class="mt-1 text-sm text-gray-500">No RT structure files have been imported for this series.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
