@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM CT & RTSTRUCT Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
+    <script src="https://unpkg.com/cornerstone-core@2.6.0/dist/cornerstone.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-math@0.1.9/dist/cornerstoneMath.min.js"></script>
+    <script src="https://unpkg.com/cornerstone-tools@6.0.6/dist/cornerstoneTools.min.js"></script>
+    <script src="https://unpkg.com/dicom-parser@1.8.21/dist/dicomParser.min.js"></script>
+    <script
+        src="https://unpkg.com/cornerstone-wado-image-loader@4.13.2/dist/cornerstoneWADOImageLoader.min.js"></script>
+    <style>
+        .viewer-container {
+            display: flex;
+            gap: 1rem;
+            height: 600px;
+        }
+
+        .viewer-panel {
+            flex: 1;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            position: relative;
+            background: #000;
+        }
+
+        .viewer-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .structure-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .structure-item {
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin: 0.25rem 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .structure-item:hover {
+            background-color: #f3f4f6;
+        }
+
+        .structure-item.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .color-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-right: 8px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">DICOM CT & RTSTRUCT Viewer</h1>
+
+        <!-- Patient Info -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <h2 class="text-xl font-semibold mb-3">Patient Information</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <span class="font-medium">Patient ID:</span>
+                    <span id="patientId" class="ml-2">{{ patient_id }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">Patient Name:</span>
+                    <span id="patientName" class="ml-2">{{ patient_name }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">Study Date:</span>
+                    <span id="studyDate" class="ml-2">{{ study_date }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">Study Description:</span>
+                    <span id="studyDescription" class="ml-2">{{ study_description }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">CT Slices:</span>
+                    <span id="ctCount" class="ml-2">{{ ct_count }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">RTSTRUCT Files:</span>
+                    <span id="rtstructCount" class="ml-2">{{ rtstruct_count }}</span>
+                </div>
+            </div>
+            {% if error %}
+            <div class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <strong>Error:</strong> {{ error }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Main Viewer -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">CT Comparison Viewer</h2>
+                <div class="flex gap-2">
+                    <button onclick="previousSlice()"
+                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                        ← Previous
+                    </button>
+                    <span class="px-4 py-2 bg-gray-200 rounded">
+                        Slice: <span id="currentSlice">1</span> / <span id="totalSlices">1</span>
+                    </span>
+                    <button onclick="nextSlice()"
+                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                        Next →
+                    </button>
+                </div>
+            </div>
+
+            <!-- Window/Level Controls -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-4 mb-3">
+                    <span class="font-medium text-sm">Window/Level Presets:</span>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="setWindowLevel('soft_tissue')"
+                            class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
+                            Soft Tissue
+                        </button>
+                        <button onclick="setWindowLevel('lung')"
+                            class="px-3 py-1 bg-cyan-500 text-white rounded text-sm hover:bg-cyan-600">
+                            Lung
+                        </button>
+                        <button onclick="setWindowLevel('bone')"
+                            class="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700">
+                            Bone
+                        </button>
+                        <button onclick="setWindowLevel('brain')"
+                            class="px-3 py-1 bg-pink-500 text-white rounded text-sm hover:bg-pink-600">
+                            Brain
+                        </button>
+                        <button onclick="setWindowLevel('liver')"
+                            class="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600">
+                            Liver
+                        </button>
+                        <button onclick="setWindowLevel('custom')"
+                            class="px-3 py-1 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600">
+                            Custom
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium">Window:</label>
+                        <input type="range" id="windowSlider" min="1" max="4000" value="400" class="w-32"
+                            onchange="updateWindowLevel()">
+                        <span id="windowValue" class="text-sm w-16">400</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium">Level:</label>
+                        <input type="range" id="levelSlider" min="-1000" max="3000" value="40" class="w-32"
+                            onchange="updateWindowLevel()">
+                        <span id="levelValue" class="text-sm w-16">40</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CT Slice Slider -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-4">
+                    <label class="text-sm font-medium">CT Slice Navigation:</label>
+                    <input type="range" id="sliceSlider" min="0" max="209" value="0" class="flex-1"
+                        onchange="goToSlice(this.value)">
+                    <div class="text-sm">
+                        <span id="sliceInfo">Slice 1 / 210</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="viewer-container">
+                <div class="viewer-panel">
+                    <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                        RTSTRUCT 1 - Manual
+                    </div>
+                    <canvas id="ctViewer1" class="viewer-canvas"></canvas>
+                </div>
+                <div class="viewer-panel">
+                    <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                        RTSTRUCT 2 - Automatic
+                    </div>
+                    <canvas id="ctViewer2" class="viewer-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Common ROI Controls -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <h3 class="text-lg font-semibold mb-3">Common ROI Overlays</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {% for structure in common_structures %}
+                <div class="flex items-center">
+                    <input type="checkbox" id="roi_{{ forloop.counter0 }}"
+                        class="mr-2 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                        onchange="toggleROI('{{ structure }}', {{ forloop.counter0 }})">
+                    <label for="roi_{{ forloop.counter0 }}" class="text-sm cursor-pointer">
+                        {{ structure }}
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button onclick="selectAllROIs()"
+                    class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+                    Select All
+                </button>
+                <button onclick="clearAllROIs()"
+                    class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
+                    Clear All
+                </button>
+            </div>
+        </div>
+
+        <!-- Comparison Stats -->
+        <div class="bg-white rounded-lg shadow-md p-4 mt-6">
+            <h3 class="text-lg font-semibold mb-3">Structure Comparison</h3>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-green-600">{{ common_structures|length }}</div>
+                    <div class="text-sm text-gray-600">Common Structures</div>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-600">{{ unique_to_1|length }}</div>
+                    <div class="text-sm text-gray-600">Unique to Manual</div>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-600">{{ unique_to_2|length }}</div>
+                    <div class="text-sm text-gray-600">Unique to Auto</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data from Django template
+        const ctData = {{ ct_data| safe }};
+        const rtstruct1Data = {{ rtstruct1_data| safe }};
+        const rtstruct2Data = {{ rtstruct2_data| safe }};
+        const rtstruct1Contours = {{ rtstruct1_contours| safe }};
+        const rtstruct2Contours = {{ rtstruct2_contours| safe }};
+        const commonStructures = {{ common_structures| safe }};
+
+        let currentSliceIndex = 0;
+        let selectedROIs = new Set();
+        let currentWindow = 400;
+        let currentLevel = 40;
+
+        // Window/Level presets
+        const windowLevelPresets = {
+            'soft_tissue': { window: 400, level: 40 },
+            'lung': { window: 1500, level: -600 },
+            'bone': { window: 2000, level: 300 },
+            'brain': { window: 80, level: 40 },
+            'liver': { window: 150, level: 60 },
+            'custom': { window: 400, level: 40 }
+        };
+
+        // Color palette for ROIs
+        const colorPalette = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2',
+            '#F8B739', '#52B788', '#E76F51', '#2A9D8F', '#E63946'
+        ];
+
+        function initializeViewer() {
+            const canvas1 = document.getElementById('ctViewer1');
+            const canvas2 = document.getElementById('ctViewer2');
+
+            // Set canvas sizes
+            canvas1.width = canvas1.offsetWidth;
+            canvas1.height = canvas1.offsetHeight;
+            canvas2.width = canvas2.offsetWidth;
+            canvas2.height = canvas2.offsetHeight;
+
+            // Update slice info
+            document.getElementById('totalSlices').textContent = ctData.length;
+            document.getElementById('currentSlice').textContent = currentSliceIndex + 1;
+
+            // Initialize slice slider
+            const sliceSlider = document.getElementById('sliceSlider');
+            sliceSlider.max = ctData.length - 1;
+            sliceSlider.value = currentSliceIndex;
+            updateSliceInfo();
+
+            // Initialize window/level sliders
+            document.getElementById('windowSlider').value = currentWindow;
+            document.getElementById('levelSlider').value = currentLevel;
+            document.getElementById('windowValue').textContent = currentWindow;
+            document.getElementById('levelValue').textContent = currentLevel;
+
+            // Display first slice on both panels
+            displaySlice();
+        }
+
+        function displaySlice() {
+            const canvas1 = document.getElementById('ctViewer1');
+            const canvas2 = document.getElementById('ctViewer2');
+            const ctx1 = canvas1.getContext('2d');
+            const ctx2 = canvas2.getContext('2d');
+
+            // Clear both canvases
+            ctx1.fillStyle = '#000';
+            ctx1.fillRect(0, 0, canvas1.width, canvas1.height);
+            ctx2.fillStyle = '#000';
+            ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+
+            if (ctData.length === 0) return;
+
+            // Update slice info
+            document.getElementById('currentSlice').textContent = currentSliceIndex + 1;
+            document.getElementById('sliceSlider').value = currentSliceIndex;
+            updateSliceInfo();
+
+            // Display CT slice on both panels
+            displayCTSlice(ctx1, canvas1.width, canvas1.height, ctData[currentSliceIndex]);
+            displayCTSlice(ctx2, canvas2.width, canvas2.height, ctData[currentSliceIndex]);
+
+            // Draw ROI overlays for current slice
+            drawROIOverlays(ctx1, canvas1.width, canvas1.height, rtstruct1Contours, ctData[currentSliceIndex]);
+            drawROIOverlays(ctx2, canvas2.width, canvas2.height, rtstruct2Contours, ctData[currentSliceIndex]);
+        }
+
+        function updateSliceInfo() {
+            document.getElementById('sliceInfo').textContent = `Slice ${currentSliceIndex + 1} / ${ctData.length}`;
+        }
+
+        function goToSlice(sliceIndex) {
+            currentSliceIndex = parseInt(sliceIndex);
+            displaySlice();
+        }
+
+        function setWindowLevel(preset) {
+            const presetValues = windowLevelPresets[preset];
+            if (presetValues) {
+                currentWindow = presetValues.window;
+                currentLevel = presetValues.level;
+
+                document.getElementById('windowSlider').value = currentWindow;
+                document.getElementById('levelSlider').value = currentLevel;
+                document.getElementById('windowValue').textContent = currentWindow;
+                document.getElementById('levelValue').textContent = currentLevel;
+
+                displaySlice();
+            }
+        }
+
+        function updateWindowLevel() {
+            currentWindow = parseInt(document.getElementById('windowSlider').value);
+            currentLevel = parseInt(document.getElementById('levelSlider').value);
+
+            document.getElementById('windowValue').textContent = currentWindow;
+            document.getElementById('levelValue').textContent = currentLevel;
+
+            displaySlice();
+        }
+
+        function displayCTSlice(ctx, canvasWidth, canvasHeight, slice) {
+            // Create image data from CT slice
+            const imageData = ctx.createImageData(slice.width, slice.height);
+
+            // Apply window/level
+            const windowWidth = currentWindow;
+            const windowLevel = currentLevel;
+            const minValue = windowLevel - windowWidth / 2;
+            const maxValue = windowLevel + windowWidth / 2;
+            const range = maxValue - minValue;
+
+            // Convert CT pixel values to display values
+            for (let i = 0; i < slice.pixels.length; i++) {
+                let pixelValue = slice.pixels[i];
+
+                // Apply window/level
+                let displayValue = ((pixelValue - minValue) / range) * 255;
+                displayValue = Math.max(0, Math.min(255, displayValue));
+
+                // Set RGB values (grayscale)
+                imageData.data[i * 4] = displayValue;     // R
+                imageData.data[i * 4 + 1] = displayValue; // G
+                imageData.data[i * 4 + 2] = displayValue; // B
+                imageData.data[i * 4 + 3] = 255;          // A
+            }
+
+            // Create temporary canvas for scaling
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = slice.width;
+            tempCanvas.height = slice.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.putImageData(imageData, 0, 0);
+
+            // Scale to fit the display canvas
+            ctx.drawImage(tempCanvas, 0, 0, slice.width, slice.height, 0, 0, canvasWidth, canvasHeight);
+        }
+
+        function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, currentSlice) {
+            ctx.globalAlpha = 0.7;
+
+            selectedROIs.forEach(roiName => {
+                const roiData = rtstructContours[roiName];
+                if (!roiData || !roiData.contours) return;
+
+                const color = colorPalette[Array.from(selectedROIs).indexOf(roiName) % colorPalette.length];
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+
+                // Get current slice Z position with better handling
+                let sliceZ = 0;
+                if (currentSlice.image_position && currentSlice.image_position.length >= 3) {
+                    sliceZ = parseFloat(currentSlice.image_position[2]);
+                } else if (currentSlice.slice_location) {
+                    sliceZ = parseFloat(currentSlice.slice_location);
+                }
+
+                // Use a larger tolerance for better ROI matching
+                const tolerance = 2.5; // Increased tolerance for slice matching
+
+                // Draw contours that match current slice
+                roiData.contours.forEach(contour => {
+                    if (contour.points && contour.points.length >= 3) {
+                        // Check if this contour is on the current slice
+                        const contourZ = parseFloat(contour.points[0][2]); // Use Z of first point
+
+                        if (Math.abs(contourZ - sliceZ) <= tolerance) {
+                            // Convert 3D points to 2D canvas coordinates with proper DICOM transformation
+                            const points2D = contour.points.map(point => {
+                                // Get CT image dimensions and transformation parameters
+                                const ctWidth = currentSlice.width;
+                                const ctHeight = currentSlice.height;
+                                const pixelSpacing = currentSlice.pixel_spacing || [1.0, 1.0];
+                                const imagePosition = currentSlice.image_position || [0, 0, 0];
+
+                                // DICOM patient coordinates (mm)
+                                let x = point[0];
+                                let y = point[1];
+
+                                // Convert patient coordinates to pixel coordinates
+                                // Formula: pixel = (patient - image_position) / pixel_spacing
+                                const pixelX = (x - imagePosition[0]) / pixelSpacing[0];
+                                const pixelY = (y - imagePosition[1]) / pixelSpacing[1];
+
+                                // Convert pixel coordinates to canvas coordinates
+                                const canvasX = pixelX * (canvasWidth / ctWidth);
+                                const canvasY = pixelY * (canvasHeight / ctHeight);
+
+                                return [canvasX, canvasY];
+                            });
+
+                            // Filter out points that are outside canvas bounds
+                            const validPoints = points2D.filter(point =>
+                                point[0] >= 0 && point[0] <= canvasWidth &&
+                                point[1] >= 0 && point[1] <= canvasHeight
+                            );
+
+                            if (validPoints.length >= 3) {
+                                // Draw the contour
+                                ctx.beginPath();
+                                ctx.moveTo(validPoints[0][0], validPoints[0][1]);
+                                for (let i = 1; i < validPoints.length; i++) {
+                                    ctx.lineTo(validPoints[i][0], validPoints[i][1]);
+                                }
+                                ctx.closePath();
+                                ctx.stroke();
+
+                                // Add ROI label at the first valid point
+                                ctx.fillStyle = color;
+                                ctx.font = '12px Arial';
+                                const labelX = validPoints[0][0];
+                                const labelY = Math.max(10, validPoints[0][1] - 5); // Ensure label is visible
+                                ctx.fillText(roiName, labelX, labelY);
+                            }
+                        }
+                    }
+                });
+            });
+
+            ctx.globalAlpha = 1.0;
+        }
+
+        function toggleROI(roiName, index) {
+            const checkbox = document.getElementById(`roi_${index}`);
+
+            if (checkbox.checked) {
+                selectedROIs.add(roiName);
+            } else {
+                selectedROIs.delete(roiName);
+            }
+
+            displaySlice(); // Redraw with new ROI selection
+        }
+
+        function selectAllROIs() {
+            selectedROIs.clear();
+            commonStructures.forEach((structure, index) => {
+                selectedROIs.add(structure);
+                document.getElementById(`roi_${index}`).checked = true;
+            });
+            displaySlice();
+        }
+
+        function clearAllROIs() {
+            selectedROIs.clear();
+            commonStructures.forEach((structure, index) => {
+                document.getElementById(`roi_${index}`).checked = false;
+            });
+            displaySlice();
+        }
+
+        function previousSlice() {
+            if (currentSliceIndex > 0) {
+                currentSliceIndex--;
+                displaySlice();
+            }
+        }
+
+        function nextSlice() {
+            if (currentSliceIndex < ctData.length - 1) {
+                currentSliceIndex++;
+                displaySlice();
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') previousSlice();
+            if (e.key === 'ArrowDown') nextSlice();
+        });
+
+        // Initialize on load
+        window.onload = initializeViewer;
+    </script>
+</body>
+
+</html>

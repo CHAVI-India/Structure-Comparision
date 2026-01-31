@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Structure Comparision{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    {% block extra_css %}{% endblock %}
 </head>
+
 <body>
     <nav class="bg-teal-700 text-white p-4">
         <div class="container mx-auto">
@@ -20,4 +23,5 @@
     {% block extra_js %}
     {% endblock %}
 </body>
+
 </html>

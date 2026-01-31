@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from .models import DICOMStudy, DICOMSeries, DICOMInstance, RTStructureFileImport
+from .models import DICOMStudy, DICOMSeries, DICOMInstance, Patient
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +60,10 @@ class DICOMScanner:
         """
         print("Clearing existing DICOM data...")
         DICOMInstance.objects.all().delete()
-        RTStructureFileImport.objects.all().delete()
+        # RTStructureFileImport.objects.all().delete()  # Model not available
         DICOMSeries.objects.all().delete()
         DICOMStudy.objects.all().delete()
+        Patient.objects.all().delete()
         print("Cleared all existing DICOM data")
     
     def process_files(self, uploaded_files):
@@ -162,9 +163,9 @@ class DICOMScanner:
             # Update series instance count
             self.processed_series[series_instance_uid]['instance_count'] += 1
             
-            # Process RT structure if applicable
-            if getattr(ds, "Modality", "") == "RTSTRUCT":
-                self._process_rt_structure_upload(ds, uploaded_file, series_instance_uid)
+            # RT structure processing disabled - model not available
+            # if getattr(ds, "Modality", "") == "RTSTRUCT":
+            #     self._process_rt_structure_upload(ds, uploaded_file, series_instance_uid)
                 
         except Exception as e:
             logger.error(f"Error processing uploaded DICOM file {uploaded_file.name}: {str(e)}")
@@ -342,9 +343,9 @@ class DICOMScanner:
             # Update instance count for the series
             self.processed_series[series_instance_uid]['instance_count'] += 1
             
-            # Check if this is an RT Structure file
-            if self._get_dicom_value(ds, 'Modality') == 'RTSTRUCT':
-                self._process_rt_structure(ds, file_path, series_instance_uid)
+            # RT structure processing disabled - model not available
+            # if self._get_dicom_value(ds, 'Modality') == 'RTSTRUCT':
+            #     self._process_rt_structure(ds, file_path,series_instance_uid)
                 
         except Exception as e:
             logger.error(f"Error processing DICOM file {file_path}: {str(e)}")
@@ -434,16 +435,16 @@ class DICOMScanner:
             created_series[series_uid] = series
             logger.info(f"{'Created' if created else 'Updated'} series: {series_uid}")
             
-            # Create RT Structure imports if any
-            for rt_data in rt_structures:
-                RTStructureFileImport.objects.update_or_create(
-                    deidentified_sop_instance_uid=rt_data['sop_instance_uid'],
-                    defaults={
-                        'deidentified_series_instance_uid': series,
-                        'deidentified_rt_structure_file_path': rt_data['deidentified_rt_structure_file_path'],
-                    }
-                )
-                logger.info(f"Created RT Structure: {rt_data['sop_instance_uid']}")
+            # RT Structure processing disabled - model not available
+            # for rt_data in rt_structures:
+            #     RTStructureFileImport.objects.update_or_create(
+            #         deidentified_sop_instance_uid=rt_data['sop_instance_uid'],
+            #         defaults={
+            #             'deidentified_series_instance_uid': series,
+            #             'deidentified_rt_structure_file_path': rt_data['deidentified_rt_structure_file_path'],
+            #         }
+            #     )
+            #     logger.info(f"Created RT Structure: {rt_data['sop_instance_uid']}")
         
         # Create instances
         for instance_data in self.processed_instances:
@@ -470,12 +471,20 @@ class DICOMScanner:
             instance_data_copy.pop('series_instance_uid', None)
             
             try:
+                # Get the first instance to link the series to
+                first_instance = DICOMInstance.objects.filter(sop_instance_uid=sop_instance_uid).first()
+                
+                if not first_instance:
+                    # Create instance first
+                    first_instance = DICOMInstance.objects.create(
+                        sop_instance_uid=sop_instance_uid,
+                        **instance_data_copy
+                    )
+                
+                # Update or create with the instance link
                 DICOMInstance.objects.update_or_create(
                     sop_instance_uid=sop_instance_uid,
-                    defaults={
-                        **instance_data_copy,
-                        'series_instance_uid': series,
-                    }
+                    defaults=instance_data_copy
                 )
             except Exception as e:
                 logger.error(f"Error creating instance {sop_instance_uid}: {e}")
