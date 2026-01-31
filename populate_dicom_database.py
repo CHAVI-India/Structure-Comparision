@@ -29,7 +29,9 @@ from rtstructcompare.models import Patient, DICOMStudy, DICOMSeries, DICOMInstan
 # ============================================================
 # CONFIGURATION: Set your default DICOM directory here
 # ============================================================
-DEFAULT_DICOM_LOCATION = '/media/sougata/d2a58c7e-1068-4f9d-be5e-b5b2bc6e9688/Structure-Comparision/dicom'
+# DEFAULT_DICOM_LOCATION = '/home/atabur/Documents/DICOMs/patients-dicom-20260131-123331'
+
+DEFAULT_DICOM_LOCATION = "/home/atabur/Downloads/DRAW HEAD & NECK validation metrics filter data set d20.zip/test"
 
 # You can also add multiple locations to choose from:
 DICOM_LOCATIONS = {

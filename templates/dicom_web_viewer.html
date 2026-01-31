@@ -6,13 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DICOM CT & RTSTRUCT Viewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
-    <script src="https://unpkg.com/cornerstone-core@2.6.0/dist/cornerstone.min.js"></script>
-    <script src="https://unpkg.com/cornerstone-math@0.1.9/dist/cornerstoneMath.min.js"></script>
-    <script src="https://unpkg.com/cornerstone-tools@6.0.6/dist/cornerstoneTools.min.js"></script>
-    <script src="https://unpkg.com/dicom-parser@1.8.21/dist/dicomParser.min.js"></script>
-    <script
-        src="https://unpkg.com/cornerstone-wado-image-loader@4.13.2/dist/cornerstoneWADOImageLoader.min.js"></script>
     <style>
         .viewer-container {
             display: flex;
@@ -26,42 +19,34 @@
             border-radius: 8px;
             position: relative;
             background: #000;
+            overflow: hidden;
         }
 
         .viewer-canvas {
             width: 100%;
             height: 100%;
+            display: block;
         }
 
-        .structure-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .structure-item {
-            padding: 0.5rem;
-            border-radius: 4px;
-            margin: 0.25rem 0;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .structure-item:hover {
-            background-color: #f3f4f6;
-        }
-
-        .structure-item.active {
-            background-color: #3b82f6;
+        .viewer-overlay {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
             color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 10;
         }
 
-        .color-box {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-right: 8px;
-            border: 1px solid #ccc;
+        .viewer-label {
+            top: 8px;
+            left: 8px;
+        }
+
+        .viewer-zoom {
+            top: 8px;
+            right: 8px;
         }
     </style>
 </head>
@@ -186,16 +171,68 @@
 
             <div class="viewer-container">
                 <div class="viewer-panel">
-                    <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                        RTSTRUCT 1 - Manual
-                    </div>
                     <canvas id="ctViewer1" class="viewer-canvas"></canvas>
+                    <div class="viewer-overlay viewer-label">RTSTRUCT 1</div>
+                    <div class="viewer-overlay viewer-zoom" id="zoom1">100%</div>
                 </div>
                 <div class="viewer-panel">
-                    <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                        RTSTRUCT 2 - Automatic
-                    </div>
                     <canvas id="ctViewer2" class="viewer-canvas"></canvas>
+                    <div class="viewer-overlay viewer-label">RTSTRUCT 2</div>
+                    <div class="viewer-overlay viewer-zoom" id="zoom2">100%</div>
+                </div>
+            </div>
+            
+            <!-- Zoom Controls -->
+            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <span class="font-medium text-sm">Zoom Controls:</span>
+                        <div class="flex gap-2">
+                            <button onclick="zoomIn(1)"
+                                class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition">
+                                + Zoom In 1
+                            </button>
+                            <button onclick="zoomOut(1)"
+                                class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition">
+                                - Zoom Out 1
+                            </button>
+                            <button onclick="resetZoom(1)"
+                                class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition">
+                                Reset 1
+                            </button>
+                        </div>
+                        <div class="flex gap-2 mx-4">
+                            <button onclick="zoomIn(2)"
+                                class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition">
+                                + Zoom In 2
+                            </button>
+                            <button onclick="zoomOut(2)"
+                                class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition">
+                                - Zoom Out 2
+                            </button>
+                            <button onclick="resetZoom(2)"
+                                class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition">
+                                Reset 2
+                            </button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="zoomBoth('in')"
+                                class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition">
+                                + Zoom Both
+                            </button>
+                            <button onclick="zoomBoth('out')"
+                                class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition">
+                                - Zoom Both
+                            </button>
+                            <button onclick="resetBothZoom()"
+                                class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition">
+                                Reset Both
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        Use mouse wheel to navigate slices, click & drag to pan
+                    </div>
                 </div>
             </div>
         </div>
@@ -250,8 +287,6 @@
     <script>
         // Data from Django template
         const ctData = {{ ct_data| safe }};
-        const rtstruct1Data = {{ rtstruct1_data| safe }};
-        const rtstruct2Data = {{ rtstruct2_data| safe }};
         const rtstruct1Contours = {{ rtstruct1_contours| safe }};
         const rtstruct2Contours = {{ rtstruct2_contours| safe }};
         const commonStructures = {{ common_structures| safe }};
@@ -260,6 +295,10 @@
         let selectedROIs = new Set();
         let currentWindow = 400;
         let currentLevel = 40;
+        let zoomLevel1 = 1.0;
+        let zoomLevel2 = 1.0;
+        let panOffset1 = { x: 0, y: 0 };
+        let panOffset2 = { x: 0, y: 0 };
 
         // Window/Level presets
         const windowLevelPresets = {
@@ -306,6 +345,12 @@
 
             // Display first slice on both panels
             displaySlice();
+            
+            // Setup mouse event handlers for zoom and pan
+            setupMouseHandlers();
+            
+            // Update zoom displays
+            updateZoomDisplays();
         }
 
         function displaySlice() {
@@ -328,12 +373,15 @@
             updateSliceInfo();
 
             // Display CT slice on both panels
-            displayCTSlice(ctx1, canvas1.width, canvas1.height, ctData[currentSliceIndex]);
-            displayCTSlice(ctx2, canvas2.width, canvas2.height, ctData[currentSliceIndex]);
+            displayCTSlice(ctx1, canvas1.width, canvas1.height, ctData[currentSliceIndex], zoomLevel1, panOffset1);
+            displayCTSlice(ctx2, canvas2.width, canvas2.height, ctData[currentSliceIndex], zoomLevel2, panOffset2);
 
             // Draw ROI overlays for current slice
-            drawROIOverlays(ctx1, canvas1.width, canvas1.height, rtstruct1Contours, ctData[currentSliceIndex]);
-            drawROIOverlays(ctx2, canvas2.width, canvas2.height, rtstruct2Contours, ctData[currentSliceIndex]);
+            drawROIOverlays(ctx1, canvas1.width, canvas1.height, rtstruct1Contours, ctData[currentSliceIndex], zoomLevel1, panOffset1);
+            drawROIOverlays(ctx2, canvas2.width, canvas2.height, rtstruct2Contours, ctData[currentSliceIndex], zoomLevel2, panOffset2);
+            
+            // Update zoom displays
+            updateZoomDisplays();
         }
 
         function updateSliceInfo() {
@@ -370,7 +418,7 @@
             displaySlice();
         }
 
-        function displayCTSlice(ctx, canvasWidth, canvasHeight, slice) {
+        function displayCTSlice(ctx, canvasWidth, canvasHeight, slice, zoomLevel = 1.0, panOffset = { x: 0, y: 0 }) {
             // Create image data from CT slice
             const imageData = ctx.createImageData(slice.width, slice.height);
 
@@ -403,11 +451,16 @@
             const tempCtx = tempCanvas.getContext('2d');
             tempCtx.putImageData(imageData, 0, 0);
 
-            // Scale to fit the display canvas
-            ctx.drawImage(tempCanvas, 0, 0, slice.width, slice.height, 0, 0, canvasWidth, canvasHeight);
+            // Scale to fit the display canvas with zoom and pan
+            const scaledWidth = slice.width * zoomLevel;
+            const scaledHeight = slice.height * zoomLevel;
+            const x = (canvasWidth - scaledWidth) / 2 + panOffset.x;
+            const y = (canvasHeight - scaledHeight) / 2 + panOffset.y;
+            
+            ctx.drawImage(tempCanvas, 0, 0, slice.width, slice.height, x, y, scaledWidth, scaledHeight);
         }
 
-        function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, currentSlice) {
+        function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, currentSlice, zoomLevel = 1.0, panOffset = { x: 0, y: 0 }) {
             ctx.globalAlpha = 0.7;
 
             selectedROIs.forEach(roiName => {
@@ -453,9 +506,14 @@
                                 const pixelX = (x - imagePosition[0]) / pixelSpacing[0];
                                 const pixelY = (y - imagePosition[1]) / pixelSpacing[1];
 
-                                // Convert pixel coordinates to canvas coordinates
-                                const canvasX = pixelX * (canvasWidth / ctWidth);
-                                const canvasY = pixelY * (canvasHeight / ctHeight);
+                                // Convert pixel coordinates to canvas coordinates with zoom and pan
+                                const scaledWidth = currentSlice.width * zoomLevel;
+                                const scaledHeight = currentSlice.height * zoomLevel;
+                                const baseX = (canvasWidth - scaledWidth) / 2 + panOffset.x;
+                                const baseY = (canvasHeight - scaledHeight) / 2 + panOffset.y;
+                                
+                                const canvasX = baseX + pixelX * zoomLevel;
+                                const canvasY = baseY + pixelY * zoomLevel;
 
                                 return [canvasX, canvasY];
                             });
@@ -539,6 +597,115 @@
             if (e.key === 'ArrowUp') previousSlice();
             if (e.key === 'ArrowDown') nextSlice();
         });
+
+        // Zoom functions
+        function updateZoomLevel(viewer, newLevel) {
+            if (viewer === 1) {
+                zoomLevel1 = Math.max(0.1, Math.min(5.0, newLevel));
+            } else {
+                zoomLevel2 = Math.max(0.1, Math.min(5.0, newLevel));
+            }
+            displaySlice();
+        }
+
+        function zoomIn(viewer) {
+            updateZoomLevel(viewer, (viewer === 1 ? zoomLevel1 : zoomLevel2) * 1.25);
+        }
+
+        function zoomOut(viewer) {
+            updateZoomLevel(viewer, (viewer === 1 ? zoomLevel1 : zoomLevel2) / 1.25);
+        }
+
+        function resetZoom(viewer) {
+            if (viewer === 1) {
+                zoomLevel1 = 1.0;
+                panOffset1 = { x: 0, y: 0 };
+            } else {
+                zoomLevel2 = 1.0;
+                panOffset2 = { x: 0, y: 0 };
+            }
+            displaySlice();
+        }
+
+        function zoomBoth(direction) {
+            const multiplier = direction === 'in' ? 1.25 : 1/1.25;
+            updateZoomLevel(1, zoomLevel1 * multiplier);
+            updateZoomLevel(2, zoomLevel2 * multiplier);
+        }
+
+        function resetBothZoom() {
+            zoomLevel1 = 1.0;
+            zoomLevel2 = 1.0;
+            panOffset1 = { x: 0, y: 0 };
+            panOffset2 = { x: 0, y: 0 };
+            displaySlice();
+        }
+
+        function updateZoomDisplays() {
+            document.getElementById('zoom1').textContent = Math.round(zoomLevel1 * 100) + '%';
+            document.getElementById('zoom2').textContent = Math.round(zoomLevel2 * 100) + '%';
+        }
+
+        // Mouse event handlers for zoom and pan
+        function setupMouseHandlers() {
+            const canvas1 = document.getElementById('ctViewer1');
+            const canvas2 = document.getElementById('ctViewer2');
+
+            // Generic wheel handler for slice navigation
+            function handleWheel(e, viewer) {
+                e.preventDefault();
+                if (e.deltaY > 0) {
+                    nextSlice();
+                } else {
+                    previousSlice();
+                }
+            }
+
+            // Generic mouse drag handlers
+            function setupDragHandlers(canvas, viewer) {
+                let isDragging = false;
+                let dragStart = { x: 0, y: 0 };
+                let initialPanOffset = { x: 0, y: 0 };
+                const panOffset = viewer === 1 ? panOffset1 : panOffset2;
+
+                canvas.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    dragStart = { x: e.clientX, y: e.clientY };
+                    initialPanOffset = { x: panOffset.x, y: panOffset.y };
+                    canvas.style.cursor = 'grabbing';
+                });
+
+                canvas.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const deltaX = e.clientX - dragStart.x;
+                        const deltaY = e.clientY - dragStart.y;
+                        panOffset.x = initialPanOffset.x + deltaX;
+                        panOffset.y = initialPanOffset.y + deltaY;
+                        displaySlice();
+                    }
+                });
+
+                canvas.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    canvas.style.cursor = 'grab';
+                });
+
+                canvas.addEventListener('mouseleave', () => {
+                    isDragging = false;
+                    canvas.style.cursor = 'default';
+                });
+
+                canvas.style.cursor = 'grab';
+            }
+
+            // Setup wheel events
+            canvas1.addEventListener('wheel', (e) => handleWheel(e, 1));
+            canvas2.addEventListener('wheel', (e) => handleWheel(e, 2));
+
+            // Setup drag events
+            setupDragHandlers(canvas1, 1);
+            setupDragHandlers(canvas2, 2);
+        }
 
         // Initialize on load
         window.onload = initializeViewer;
