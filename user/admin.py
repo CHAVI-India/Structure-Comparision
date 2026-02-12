@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.models import User, Group, Permission
-from rtstructcompare.models import Patient, DICOMStudy, DICOMSeries, DICOMInstance, RTStruct, Roi
+from rtstructcompare.models import Patient, DICOMStudy, DICOMSeries, DICOMInstance, RTStruct, Roi, Feedback
 
 
 @admin.register(Patient)
@@ -144,14 +144,14 @@ class RTStructAdmin(admin.ModelAdmin):
 @admin.register(Roi)
 class RoiAdmin(admin.ModelAdmin):
     """Admin interface for ROI (Region of Interest) model"""
-    list_display = ('roi_name', 'roi_id', 'rtstruct', 'roi_color', 'roi_description')
+    list_display = ('roi_label', 'roi_id', 'rtstruct', 'roi_color', 'roi_description')
     list_filter = ('rtstruct',)
-    search_fields = ('roi_name', 'roi_id', 'roi_description', 'rtstruct__rtstruct_instance_uid')
+    search_fields = ('roi_label', 'roi_id', 'roi_description', 'rtstruct__rtstruct_instance_uid')
     readonly_fields = ('id',)
     
     fieldsets = (
         ('ROI Information', {
-            'fields': ('id', 'rtstruct', 'roi_name', 'roi_id')
+            'fields': ('id', 'rtstruct', 'roi_label', 'roi_id')
         }),
         ('ROI Details', {
             'fields': ('roi_description', 'roi_color')
@@ -160,6 +160,40 @@ class RoiAdmin(admin.ModelAdmin):
     
     # Show related RTStruct info
     autocomplete_fields = ['rtstruct']
+
+
+@admin.register(Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    """Admin interface for Feedback model"""
+    list_display = ('id', 'user', 'patient', 'roi', 'roi_label', 'rt1_rating', 'rt2_rating', 'comment', 'created_at', 'updated_at')
+    list_filter = ('rt1_rating', 'rt2_rating', 'created_at', 'updated_at')
+    search_fields = (
+        'user__username',
+        'patient__patient_id',
+        'patient__patient_name',
+        'roi__roi_label',
+        'comment'
+    )
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+
+    fieldsets = (
+        ('Feedback Information', {
+            'fields': ('id', 'user', 'patient', 'roi', 'roi_label', 'rt1_rating', 'rt2_rating')
+        }),
+        ('Details', {
+            'fields': ('comment',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    autocomplete_fields = ['user', 'patient', 'roi']
+
+
+
 
 
 # Customize admin site header and title

@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Admin Dashboard - Structure Comparison{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'rtstructcompare/js/admin_dashboard.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/admin_dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-shell">
+    <section class="hero">
+        <h1>Admin Control Center</h1>
+        <p>Assign patients, track coverage, and review feedback across all users.</p>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Assigned Users</div>
+                <div class="value">{{ assigned_users_count }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Assigned Patients</div>
+                <div class="value">{{ assigned_patients_count }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Assignments</div>
+                <div class="value">{{ total_assignments }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Feedback (Assigned Users)</div>
+                <div class="value">{{ assigned_feedbacks_count }}</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="section-header">
+            <h2>Assign Patients</h2>
+            <a class="btn btn-secondary" href="{% url 'patients' %}">View Patient Page</a>
+        </div>
+
+        {% if status_message %}
+            <div class="status {{ status_type }}">
+                <span>{{ status_message }}</span>
+                <button type="button" class="status-close" aria-label="Dismiss">&times;</button>
+            </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="grid-2">
+                <div class="form-control">
+                    <div class="flex items-center justify-between">
+                        <label for="user_ids" class="label-inline">Select Users</label>
+                        <div class="group-toolbar" id="groupToolbar">
+                            <button type="button" class="group-trigger" id="groupTrigger">
+                                Group: <span id="selectedGroupLabel">No group</span> ▾
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-xs" id="openGroupModal">+ Create Group</button>
+                            <div class="group-dropdown" id="groupDropdown">
+                                {% if assignment_groups %}
+                                    {% for group in assignment_groups %}
+                                        <button type="button" class="group-option" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}">
+                                            <div class="group-option-name">{{ group.name }}</div>
+                                            <div class="group-option-meta">
+                                                {{ group.users.all|length }} users
+                                                {% if group.description %} · {{ group.description|truncatechars:40 }}{% endif %}
+                                            </div>
+                                        </button>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="group-empty">No groups yet. Create one to assign faster.</div>
+                                {% endif %}
+                                <button type="button" class="group-clear" id="clearGroupSelection">Clear group selection</button>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" name="group_id" id="group_id">
+                    <!-- <div class="helper-text">Assigning a group will include every user inside it.</div> -->
+                    <input type="text" id="user_search" name="user_search" placeholder="Search users by username or email">
+                    <div class="helper-text">Type to filter the list below.</div>
+                    <select id="user_ids" name="user_ids" multiple size="6">
+                        <option value="" disabled>Choose user(s)</option>
+                        {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.username }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="helper-text">*Hold Ctrl (Cmd on Mac) to select multiple users or patients.</div>
+                </div>
+                <div class="form-control">
+                    <label for="patient_ids">Select Patients</label>
+                    <input type="text" id="patient_search" name="patient_search" placeholder="Search patients by ID or name">
+                    <div class="helper-text">Type to filter the list below.</div>
+                    <select id="patient_ids" name="patient_ids" multiple size="6" required>
+                        {% for patient in patients %}
+                            <option value="{{ patient.id }}">
+                                {{ patient.patient_id }}{% if patient.patient_name %} — {{ patient.patient_name }}{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit" name="action" value="assign">Assign</button>
+                <button class="btn btn-danger" type="submit" name="action" value="unassign">Unassign</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel">
+        <div class="section-header">
+            <h2>Assignment Overview</h2>
+            {% if assignment_page_obj %}
+                <div class="pagination-controls">
+                    {% if assignment_page_obj.has_previous %}
+                        <a class="page-link" href="{{ assignment_page_prefix }}assignment_page={{ assignment_page_obj.previous_page_number }}">Prev</a>
+                    {% endif %}
+                    <span class="page-status">Page {{ assignment_page_obj.number }} of {{ assignment_page_obj.paginator.num_pages }}</span>
+                    {% if assignment_page_obj.has_next %}
+                        <a class="page-link" href="{{ assignment_page_prefix }}assignment_page={{ assignment_page_obj.next_page_number }}">Next</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>Assigned Users</th>
+                        <th>Groups</th>
+                        <th>Last Assigned</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in assignment_rows %}
+                        <tr>
+                            <td>
+                                <strong>{{ row.patient.patient_id }}</strong>
+                                {% if row.patient.patient_name %}
+                                    <div class="text-sm text-slate-500">{{ row.patient.patient_name }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.usernames %}
+                                    {% for username in row.usernames %}
+                                        <span class="pill">{{ username }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.groups %}
+                                    {% for group in row.groups %}
+                                        <span class="pill pill-group">{{ group }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.last_assigned %}
+                                    {{ row.last_assigned|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No patients available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="section-header">
+            <h2>Recent Feedback</h2>
+            {% if feedback_page_obj %}
+                <div class="pagination-controls">
+                    {% if feedback_page_obj.has_previous %}
+                        <a class="page-link" href="{{ feedback_page_prefix }}feedback_page={{ feedback_page_obj.previous_page_number }}">Prev</a>
+                    {% endif %}
+                    <span class="page-status">Page {{ feedback_page_obj.number }} of {{ feedback_page_obj.paginator.num_pages }}</span>
+                    {% if feedback_page_obj.has_next %}
+                        <a class="page-link" href="{{ feedback_page_prefix }}feedback_page={{ feedback_page_obj.next_page_number }}">Next</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Patient</th>
+                        <th>ROI</th>
+                        <th>RT1 Label</th>
+                        <th>RT1 Rating</th>
+                        <th>RT2 Label</th>
+                        <th>RT2 Rating</th>
+                        <th>Comment</th>
+                        <th>Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for feedback in feedbacks %}
+                        <tr>
+                            <td>{{ feedback.user.username }}</td>
+                            <td>{{ feedback.patient.patient_id }}</td>
+                            <td>{% if feedback.roi %}{{ feedback.roi.roi_name }}{% else %}{{ feedback.roi_name|default:"—" }}{% endif %}</td>
+                            <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
+                            <td>{{ feedback.rt1_rating|default:"—" }}</td>
+                            <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
+                            <td>{{ feedback.rt2_rating|default:"—" }}</td>
+                            <td>{{ feedback.comment|default:"—" }}</td>
+                            <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9">No feedback submitted yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="modal-backdrop" id="groupModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div class="modal-header">
+            <h3 class="modal-title" id="groupModalTitle">Create Assignment Group</h3>
+            <button type="button" class="modal-close" id="closeGroupModal">&times;</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_group">
+            <div class="form-control">
+                <label for="group_name">Group Name</label>
+                <input type="text" id="group_name" name="group_name" placeholder="e.g. Breast QA Team" required>
+            </div>
+            <div class="form-control">
+                <label for="group_description">Description</label>
+                <textarea id="group_description" name="group_description" rows="3" placeholder="Optional: purpose, modality focus, or region"></textarea>
+            </div>
+            <div class="form-control">
+                <label for="group_user_ids">Add Users</label>
+                <input type="text" id="group_user_search" name="group_user_search" placeholder="Search users to include">
+                <div class="helper-text">Pick the users who should receive group assignments.</div>
+                <select id="group_user_ids" name="group_user_ids" multiple size="7" required>
+                    {% for user in users %}
+                        <option value="{{ user.id }}">{{ user.username }}{% if user.email %} · {{ user.email }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="cancelGroupModal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Group</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

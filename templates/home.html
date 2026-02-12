@@ -1,113 +1,121 @@
 {% extends 'base.html' %}
 
-{% block title %}Home - DICOM Structure Comparison{% endblock %}
+{% block title %}Home - Structure Comparison{% endblock %}
+
+{% block extra_css %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'rtstructcompare/css/home.css' %}">
+{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
-    <!-- Hero Section -->
-    <div class="container mx-auto px-4 py-16">
-        <div class="max-w-4xl mx-auto text-center">
-            <h1 class="text-5xl font-bold text-gray-900 mb-4">
-                DICOM Structure Comparison
-            </h1>
-            <p class="text-xl text-gray-600 mb-8">
-                Compare and evaluate RT structure sets with advanced visualization tools
+<div class="home-shell">
+    <section class="container mx-auto px-6 py-16">
+        <div class="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 items-center">
+            <div>
+                <div class="hero-badge">Clinical QA Workspace</div>
+                <h1 class="text-4xl md:text-5xl font-semibold leading-tight mt-4">
+                    Structure Comparison for Radiotherapy Teams
+                </h1>
+                <p class="text-lg text-slate-600 mt-4 max-w-xl">
+                    A secure, role-based environment for comparing RTSTRUCT data, capturing ROI feedback, and managing
+                    review assignments with traceability.
+                </p>
+                <div class="flex flex-wrap gap-4 mt-8">
+                    {% if request.user.is_authenticated %}
+                        <a href="{% url 'patients' %}" class="cta-primary">Go to My Patients</a>
+                        {% if request.user.is_staff %}
+                            <a href="{% url 'admin_dashboard' %}" class="cta-secondary">Admin Dashboard</a>
+                        {% endif %}
+                    {% else %}
+                        <a href="{% url 'login' %}" class="cta-primary">Login</a>
+                        <a href="#request-access" class="cta-secondary">Request Access</a>
+                    {% endif %}
+                </div>
+                <div class="flex flex-wrap gap-4 text-sm text-slate-500 mt-6">
+                    <span>Role-based assignments</span>
+                    <span>ROI-level feedback capture</span>
+                    <span>Audit-ready review trail</span>
+                </div>
+            </div>
+            <div class="hero-card">
+                <h3 class="text-xl font-semibold">Workflow snapshot</h3>
+                <p class="text-slate-600 mt-2">
+                    Streamline multidisciplinary review with a single workspace for imaging, structure overlays, and feedback.
+                </p>
+                <div class="grid gap-3 mt-6">
+                    <div class="step">
+                        <div class="text-sm font-semibold text-slate-800">1. Assign review workload</div>
+                        <div class="text-sm text-slate-600">Admins allocate patients to raters and reviewers.</div>
+                    </div>
+                    <div class="step">
+                        <div class="text-sm font-semibold text-slate-800">2. Compare RTSTRUCTs</div>
+                        <div class="text-sm text-slate-600">Visualize overlays and inspect ROI differences.</div>
+                    </div>
+                    <div class="step">
+                        <div class="text-sm font-semibold text-slate-800">3. Capture structured feedback</div>
+                        <div class="text-sm text-slate-600">Record ratings with comments for downstream QA.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="container mx-auto px-6 py-6">
+        <div class="grid md:grid-cols-3 gap-6">
+            <div class="metric-card">
+                <h3 class="text-lg font-semibold">Operational metrics</h3>
+                <p class="text-sm mt-2">Track assignment coverage, reviewer throughput, and feedback completion after login.</p>
+            </div>
+            <div class="metric-card">
+                <h3 class="text-lg font-semibold">Quality indicators</h3>
+                <p class="text-sm mt-2">Measure ROI agreement, revision notes, and review confidence across teams.</p>
+            </div>
+            <div class="metric-card">
+                <h3 class="text-lg font-semibold">Audit visibility</h3>
+                <p class="text-sm mt-2">Maintain structured traceability for every feedback decision and change.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="container mx-auto px-6 py-14">
+        <div class="text-center max-w-2xl mx-auto">
+            <h2 class="section-title">Purpose-built for clinical review</h2>
+            <p class="section-subtitle">
+                Everything you need to coordinate RTSTRUCT comparison across teams without exposing patient data publicly.
             </p>
-
-            <!-- Action Buttons -->
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="{% url 'patients' %}"
-                    class="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg">
-                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
-                        </path>
-                    </svg>
-                    View All Patients
-                </a>
-
-                <a href="{% url 'admin:index' %}"
-                    class="px-8 py-4 bg-white text-purple-600 font-semibold rounded-lg border-2 border-purple-200 hover:bg-purple-50 transition-all duration-300 transform hover:scale-105">
-                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
-                        </path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    </svg>
-                    Admin Panel
-                </a>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6 mt-10">
+            <div class="feature-card">
+                <h3 class="text-lg font-semibold">Multi-structure visualization</h3>
+                <p class="text-sm text-slate-600">Overlay RTSTRUCT sets with precise contour inspection tools.</p>
+            </div>
+            <div class="feature-card">
+                <h3 class="text-lg font-semibold">Controlled access</h3>
+                <p class="text-sm text-slate-600">Role-based dashboards ensure users see only assigned patients.</p>
+            </div>
+            <div class="feature-card">
+                <h3 class="text-lg font-semibold">Structured feedback</h3>
+                <p class="text-sm text-slate-600">Capture reviewer decisions with ROI-level annotations and comments.</p>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- Features Grid -->
-    <div class="container mx-auto px-4 py-8">
-        <div class="max-w-6xl mx-auto">
-            <div class="grid md:grid-cols-3 gap-8 mb-12">
-                <div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
-                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
-                            </path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">DICOM Viewer</h3>
-                    <p class="text-gray-600">Advanced visualization tools for viewing and analyzing DICOM images with RT
-                        structure overlays</p>
+    <section class="container mx-auto px-6 py-12">
+        <div class="access-panel" id="request-access">
+            <div class="grid md:grid-cols-[1.3fr_0.7fr] gap-6 items-center">
+                <div>
+                    <h2 class="text-2xl font-semibold">Request access</h2>
+                    <p class="mt-2">
+                        Access is managed by your administrator. Use the login if you already have credentials or request
+                        onboarding through your clinical lead.
+                    </p>
                 </div>
-
-                <div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
-                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
-                            </path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Quality Rating</h3>
-                    <p class="text-gray-600">Comprehensive rating system for evaluating structure set quality and
-                        contour modifications</p>
-                </div>
-
-                <div class="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
-                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
-                            </path>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Search & Filter</h3>
-                    <p class="text-gray-600">Powerful search capabilities to find and filter patients, studies, and RT
-                        structures</p>
-                </div>
-            </div>
-
-            <!-- Quick Stats -->
-            <div class="bg-white rounded-xl p-8 shadow-lg">
-                <h2 class="text-2xl font-bold text-gray-900 mb-6">Quick Overview</h2>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-purple-600 mb-2">📁</div>
-                        <div class="text-sm text-gray-600">Patient Studies</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-blue-600 mb-2">🏥</div>
-                        <div class="text-sm text-gray-600">DICOM Series</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-green-600 mb-2">⭐</div>
-                        <div class="text-sm text-gray-600">Rated Structures</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-3xl font-bold text-orange-600 mb-2">📊</div>
-                        <div class="text-sm text-gray-600">Quality Scores</div>
-                    </div>
+                <div class="flex flex-wrap gap-3">
+                    <a href="{% url 'admin:login' %}" class="cta-primary">Login</a>
+                    <a href="mailto:admin@your-organization.com" class="cta-secondary">Email Admin</a>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 {% endblock %}

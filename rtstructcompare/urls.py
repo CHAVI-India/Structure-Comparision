@@ -8,19 +8,22 @@ Simplified to include only essential pages:
 """
 from django.contrib import admin
 from django.urls import path
+from django.contrib.auth import views as auth_views
 from rtstructcompare import views
 
 urlpatterns = [
-    # Admin
     path('admin/', admin.site.urls),
-    
-    # Main pages
+    path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
+
+    path('user-dashboard/', views.user_dashboard, name='user_dashboard'),
+
     path('', views.home, name='home'),
+    path('login/', views.RoleBasedLoginView.as_view(template_name='login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
     path('patients/', views.patients, name='patients'),
-    path('dicom_web_viewer/', views.dicom_web_viewer, name='dicom_web_viewer'),
-    path('dicom_web_viewer/<uuid:patient_uuid>/', views.dicom_web_viewer, name='dicom_web_viewer_patient'),
+    path('patients/<uuid:patient_uuid>/', views.dicom_web_viewer, name='dicom_web_viewer_patient'),
     
-    # API endpoints for DICOM viewer
     path('api/load-dicom-data/', views.load_dicom_data, name='load_dicom_data'),
     path('api/get-dicom-slice/', views.get_dicom_slice, name='get_dicom_slice'),
+    path('api/submit-feedback/', views.submit_feedback, name='submit_feedback'),
 ]

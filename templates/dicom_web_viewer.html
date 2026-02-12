@@ -6,49 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DICOM CT & RTSTRUCT Viewer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .viewer-container {
-            display: flex;
-            gap: 1rem;
-            height: 600px;
-        }
-
-        .viewer-panel {
-            flex: 1;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            position: relative;
-            background: #000;
-            overflow: hidden;
-        }
-
-        .viewer-canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        .viewer-overlay {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        .viewer-label {
-            top: 8px;
-            left: 8px;
-        }
-
-        .viewer-zoom {
-            top: 8px;
-            right: 8px;
-        }
-    </style>
+    {% block extra_css %}
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/dicom_web_viewer.css' %}">
+    {% endblock %}
 </head>
 
 <body class="bg-gray-100">
@@ -61,11 +22,7 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                     <span class="font-medium">Patient ID:</span>
-                    <span id="patientId" class="ml-2">{{ patient_id }}</span>
-                </div>
-                <div>
-                    <span class="font-medium">Patient Name:</span>
-                    <span id="patientName" class="ml-2">{{ patient_name }}</span>
+                    <span id="patientId" class="ml-2 text-sm">{{ patient_id }}</span>
                 </div>
                 <div>
                     <span class="font-medium">Study Date:</span>
@@ -83,6 +40,18 @@
                     <span class="font-medium">RTSTRUCT Files:</span>
                     <span id="rtstructCount" class="ml-2">{{ rtstruct_count }}</span>
                 </div>
+                <div>
+                    <span class="font-medium">RT1 ROI Count:</span>
+                    <span class="ml-2">{{ rt1_roi_count }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">RT2 ROI Count:</span>
+                    <span class="ml-2">{{ rt2_roi_count }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">Common ROI Count:</span>
+                    <span class="ml-2">{{ common_roi_count }}</span>
+                </div>
             </div>
             {% if error %}
             <div class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -93,6 +62,14 @@
 
         <!-- Main Viewer -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div id="comparisonBanner" class="mb-4 p-4 rounded-lg border-2 border-indigo-300 bg-indigo-50 relative">
+                <button type="button" onclick="dismissComparisonBanner()" aria-label="Dismiss comparison banner"
+                    class="absolute top-2 right-2 text-indigo-700 hover:text-indigo-900 text-lg leading-none">
+                    ×
+                </button>
+                <div class="text-lg font-semibold text-indigo-800">Comparison Mode</div>
+                <div class="text-sm text-indigo-700">This viewer is built to compare two RTSTRUCTs side-by-side. Please submit your overall preference below.</div>
+            </div>
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-semibold">CT Comparison Viewer</h2>
                 <div class="flex gap-2">
@@ -115,6 +92,10 @@
                 <div class="flex items-center gap-4 mb-3">
                     <span class="font-medium text-sm">Window/Level Presets:</span>
                     <div class="flex gap-2 flex-wrap">
+                        <button onclick="setWindowLevel('pan')"
+                            class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+                            Pan
+                        </button>
                         <button onclick="setWindowLevel('soft_tissue')"
                             class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
                             Soft Tissue
@@ -144,15 +125,15 @@
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium">Window:</label>
-                        <input type="range" id="windowSlider" min="1" max="4000" value="400" class="w-32"
+                        <input type="range" id="windowSlider" min="1" max="4000" value="2000" class="w-32"
                             onchange="updateWindowLevel()">
-                        <span id="windowValue" class="text-sm w-16">400</span>
+                        <span id="windowValue" class="text-sm w-16">2000</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium">Level:</label>
-                        <input type="range" id="levelSlider" min="-1000" max="3000" value="40" class="w-32"
+                        <input type="range" id="levelSlider" min="-1000" max="3000" value="1000" class="w-32"
                             onchange="updateWindowLevel()">
-                        <span id="levelValue" class="text-sm w-16">40</span>
+                        <span id="levelValue" class="text-sm w-16">1000</span>
                     </div>
                 </div>
             </div>
@@ -172,12 +153,12 @@
             <div class="viewer-container">
                 <div class="viewer-panel">
                     <canvas id="ctViewer1" class="viewer-canvas"></canvas>
-                    <div class="viewer-overlay viewer-label">RTSTRUCT 1</div>
+                    <div class="viewer-overlay viewer-label" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_dicom_label|default:'RTSTRUCT 1'|truncatechars:50 }}</div>
                     <div class="viewer-overlay viewer-zoom" id="zoom1">100%</div>
                 </div>
                 <div class="viewer-panel">
                     <canvas id="ctViewer2" class="viewer-canvas"></canvas>
-                    <div class="viewer-overlay viewer-label">RTSTRUCT 2</div>
+                    <div class="viewer-overlay viewer-label" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_dicom_label|default:'RTSTRUCT 2'|truncatechars:50 }}</div>
                     <div class="viewer-overlay viewer-zoom" id="zoom2">100%</div>
                 </div>
             </div>
@@ -264,452 +245,141 @@
             </div>
         </div>
 
-        <!-- Comparison Stats -->
-        <div class="bg-white rounded-lg shadow-md p-4 mt-6">
-            <h3 class="text-lg font-semibold mb-3">Structure Comparison</h3>
-            <div class="grid grid-cols-3 gap-4 text-center">
-                <div class="bg-green-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-green-600">{{ common_structures|length }}</div>
-                    <div class="text-sm text-gray-600">Common Structures</div>
+        <!-- ROI Ratings -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <h3 class="text-lg font-semibold mb-3">ROI Structure Ratings</h3>
+            <p class="text-sm text-gray-600 mb-4">Rate each structure from 1 to 10 for both RTSTRUCTs.</p>
+            <div id="roiRatingStatus" class="text-sm mb-3 text-gray-600"></div>
+            <div class="mb-4 grid gap-2 text-xs text-gray-500">
+                <div class="flex flex-wrap gap-2">
+                    <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">9-10 Excellent</span>
+                    <span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">7-8 Very good</span>
+                    <span class="px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-100">5-6 Good</span>
+                    <span class="px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-100">3-4 Fair</span>
+                    <span class="px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100">1-2 Needs work</span>
                 </div>
-                <div class="bg-blue-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-blue-600">{{ unique_to_1|length }}</div>
-                    <div class="text-sm text-gray-600">Unique to Manual</div>
-                </div>
-                <div class="bg-purple-50 p-4 rounded-lg">
-                    <div class="text-2xl font-bold text-purple-600">{{ unique_to_2|length }}</div>
-                    <div class="text-sm text-gray-600">Unique to Auto</div>
+            </div>
+            <div class="overflow-x-auto rounded border border-gray-200">
+                <table class="w-full min-w-[640px] text-sm" id="roiRatingTable">
+                    <caption class="sr-only">ROI rating controls for RTSTRUCT comparison</caption>
+                    <thead>
+                        <tr class="border-b bg-gray-50">
+                            <th scope="col" class="text-left py-2 px-2 font-semibold">ROI Name</th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold">
+                                <label class="inline-flex items-center gap-1 text-xs text-gray-500">
+                                    <input type="checkbox" id="roiRatingSelectAll">
+                                    <span class="opacity-600">Select ROIs</span>
+                                </label>
+                            </th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_label|default:'RTSTRUCT 1'|truncatechars:30 }}</th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_label|default:'RTSTRUCT 2'|truncatechars:30 }}</th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold">Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for structure in common_structures %}
+                        <tr class="border-b hover:bg-gray-50" data-roi-name="{{ structure }}">
+                            <th scope="row" class="py-2 px-2 font-medium text-left">{{ structure }}</th>
+                            <td class="py-2 px-2 text-center">
+                                <label class="inline-flex items-center gap-1 text-xs text-gray-600">
+                                    <input type="checkbox" class="roi-rating-include">
+                                </label>
+                            </td>
+                            <td class="p-2 text-center">
+                                <div class="rating-control">
+                                    <div class="flex justify-center gap-4">
+                                        <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 1">
+                                            {% for star in '1234567890'|make_list %}
+                                            <label class="inline-flex flex-col items-center text-xs">
+                                                <input type="radio" class="hidden roi-rating-r1 roi-rating-star" name="roi-rating-r1-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
+                                                    data-roi-name="{{ structure }}"
+                                                    data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r1"
+                                                    aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r1">
+                                                <span class="text-xl select-none star-icon">★</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="flex items-center justify-center gap-2 mt-1 text-sm">
+                                            <span id="rating-display-{{ forloop.counter0 }}-r1" class="rating-display" aria-live="polite">Not rated</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-2 text-center">
+                                <div class="rating-control">
+                                    <div class="flex justify-center gap-4">
+                                        <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 2">
+                                            {% for star in '1234567890'|make_list %}
+                                            <label class="inline-flex flex-col items-center text-xs">
+                                                <input type="radio" class="hidden roi-rating-r2 roi-rating-star" name="roi-rating-r2-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
+                                                    data-roi-name="{{ structure }}"
+                                                    data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r2"
+                                                    aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r2">
+                                                <span class="text-xl select-none star-icon">★</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="flex items-center justify-center gap-2 mt-1 text-sm">
+                                            <span id="rating-display-{{ forloop.counter0 }}-r2" class="rating-display" aria-live="polite">Not rated</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        <td class="py-2 px-2 text-center">
+                            <button type="button"
+                                class="roi-comment-btn px-2 py-1 text-xs border rounded hover:bg-gray-100 transition"
+                                data-roi-name="{{ structure }}"
+                                aria-label="Add comment for {{ structure }}"
+                                title="Add comment">
+                                💬
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="px-2 py-4 flex items-center justify-end gap-3 w-full">
+                <span id="submitRatingStatus" class="text-sm"></span>
+                <button id="submitAllRatingsBtn" type="button"
+                    class="flex flex-end justify-end px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-sm font-semibold">
+                    Submit Ratings
+                </button>
+            </div>
+        </div>
+
+        <!-- Comment Modal -->
+        <div id="commentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                <h4 class="text-md font-semibold mb-1">Comment for <span id="commentModalRoiName"></span></h4>
+                <textarea id="commentModalText" rows="4"
+                    class="w-full border rounded p-2 text-sm mt-2 resize-none" placeholder="Enter your comment..."></textarea>
+                <div class="mt-3 flex justify-end gap-2">
+                    <button type="button" id="commentModalCancel"
+                        class="px-4 py-2 border rounded text-sm hover:bg-gray-100 transition">Cancel</button>
+                    <button type="button" id="commentModalSave"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 transition">Save</button>
                 </div>
             </div>
         </div>
+
     </div>
-
     <script>
-        // Data from Django template
-        const ctData = {{ ct_data| safe }};
-        const rtstruct1Contours = {{ rtstruct1_contours| safe }};
-        const rtstruct2Contours = {{ rtstruct2_contours| safe }};
-        const commonStructures = {{ common_structures| safe }};
-
-        let currentSliceIndex = 0;
-        let selectedROIs = new Set();
-        let currentWindow = 400;
-        let currentLevel = 40;
-        let zoomLevel1 = 1.0;
-        let zoomLevel2 = 1.0;
-        let panOffset1 = { x: 0, y: 0 };
-        let panOffset2 = { x: 0, y: 0 };
-
-        // Window/Level presets
-        const windowLevelPresets = {
-            'soft_tissue': { window: 400, level: 40 },
-            'lung': { window: 1500, level: -600 },
-            'bone': { window: 2000, level: 300 },
-            'brain': { window: 80, level: 40 },
-            'liver': { window: 150, level: 60 },
-            'custom': { window: 400, level: 40 }
+        window.dicomViewerData = {
+            ctData: {{ ct_data|safe }},
+            rt1Contours: {{ rt1_contours|safe }},
+            rt2Contours: {{ rt2_contours|safe }},
+            commonStructures: {{ common_structures|safe }},
+            patientId: "{{ patient_id|escapejs }}",
+            rt1Label: "{{ rt1_label|default:'RTSTRUCT 1'|escapejs }}",
+            rt2Label: "{{ rt2_label|default:'RTSTRUCT 2'|escapejs }}",
+            rt1SopUid: "{{ rt1_sop_uid|default:''|escapejs }}",
+            rt2SopUid: "{{ rt2_sop_uid|default:''|escapejs }}",
+            studyUid: "{{ study_uid|default:''|escapejs }}",
+            initialFeedback: {{ initial_feedback|default:'null'|safe }},
+            roiData: {{ roi_data|default:'{}'|safe }}
         };
-
-        // Color palette for ROIs
-        const colorPalette = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-            '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2',
-            '#F8B739', '#52B788', '#E76F51', '#2A9D8F', '#E63946'
-        ];
-
-        function initializeViewer() {
-            const canvas1 = document.getElementById('ctViewer1');
-            const canvas2 = document.getElementById('ctViewer2');
-
-            // Set canvas sizes
-            canvas1.width = canvas1.offsetWidth;
-            canvas1.height = canvas1.offsetHeight;
-            canvas2.width = canvas2.offsetWidth;
-            canvas2.height = canvas2.offsetHeight;
-
-            // Update slice info
-            document.getElementById('totalSlices').textContent = ctData.length;
-            document.getElementById('currentSlice').textContent = currentSliceIndex + 1;
-
-            // Initialize slice slider
-            const sliceSlider = document.getElementById('sliceSlider');
-            sliceSlider.max = ctData.length - 1;
-            sliceSlider.value = currentSliceIndex;
-            updateSliceInfo();
-
-            // Initialize window/level sliders
-            document.getElementById('windowSlider').value = currentWindow;
-            document.getElementById('levelSlider').value = currentLevel;
-            document.getElementById('windowValue').textContent = currentWindow;
-            document.getElementById('levelValue').textContent = currentLevel;
-
-            // Display first slice on both panels
-            displaySlice();
-            
-            // Setup mouse event handlers for zoom and pan
-            setupMouseHandlers();
-            
-            // Update zoom displays
-            updateZoomDisplays();
-        }
-
-        function displaySlice() {
-            const canvas1 = document.getElementById('ctViewer1');
-            const canvas2 = document.getElementById('ctViewer2');
-            const ctx1 = canvas1.getContext('2d');
-            const ctx2 = canvas2.getContext('2d');
-
-            // Clear both canvases
-            ctx1.fillStyle = '#000';
-            ctx1.fillRect(0, 0, canvas1.width, canvas1.height);
-            ctx2.fillStyle = '#000';
-            ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
-
-            if (ctData.length === 0) return;
-
-            // Update slice info
-            document.getElementById('currentSlice').textContent = currentSliceIndex + 1;
-            document.getElementById('sliceSlider').value = currentSliceIndex;
-            updateSliceInfo();
-
-            // Display CT slice on both panels
-            displayCTSlice(ctx1, canvas1.width, canvas1.height, ctData[currentSliceIndex], zoomLevel1, panOffset1);
-            displayCTSlice(ctx2, canvas2.width, canvas2.height, ctData[currentSliceIndex], zoomLevel2, panOffset2);
-
-            // Draw ROI overlays for current slice
-            drawROIOverlays(ctx1, canvas1.width, canvas1.height, rtstruct1Contours, ctData[currentSliceIndex], zoomLevel1, panOffset1);
-            drawROIOverlays(ctx2, canvas2.width, canvas2.height, rtstruct2Contours, ctData[currentSliceIndex], zoomLevel2, panOffset2);
-            
-            // Update zoom displays
-            updateZoomDisplays();
-        }
-
-        function updateSliceInfo() {
-            document.getElementById('sliceInfo').textContent = `Slice ${currentSliceIndex + 1} / ${ctData.length}`;
-        }
-
-        function goToSlice(sliceIndex) {
-            currentSliceIndex = parseInt(sliceIndex);
-            displaySlice();
-        }
-
-        function setWindowLevel(preset) {
-            const presetValues = windowLevelPresets[preset];
-            if (presetValues) {
-                currentWindow = presetValues.window;
-                currentLevel = presetValues.level;
-
-                document.getElementById('windowSlider').value = currentWindow;
-                document.getElementById('levelSlider').value = currentLevel;
-                document.getElementById('windowValue').textContent = currentWindow;
-                document.getElementById('levelValue').textContent = currentLevel;
-
-                displaySlice();
-            }
-        }
-
-        function updateWindowLevel() {
-            currentWindow = parseInt(document.getElementById('windowSlider').value);
-            currentLevel = parseInt(document.getElementById('levelSlider').value);
-
-            document.getElementById('windowValue').textContent = currentWindow;
-            document.getElementById('levelValue').textContent = currentLevel;
-
-            displaySlice();
-        }
-
-        function displayCTSlice(ctx, canvasWidth, canvasHeight, slice, zoomLevel = 1.0, panOffset = { x: 0, y: 0 }) {
-            // Create image data from CT slice
-            const imageData = ctx.createImageData(slice.width, slice.height);
-
-            // Apply window/level
-            const windowWidth = currentWindow;
-            const windowLevel = currentLevel;
-            const minValue = windowLevel - windowWidth / 2;
-            const maxValue = windowLevel + windowWidth / 2;
-            const range = maxValue - minValue;
-
-            // Convert CT pixel values to display values
-            for (let i = 0; i < slice.pixels.length; i++) {
-                let pixelValue = slice.pixels[i];
-
-                // Apply window/level
-                let displayValue = ((pixelValue - minValue) / range) * 255;
-                displayValue = Math.max(0, Math.min(255, displayValue));
-
-                // Set RGB values (grayscale)
-                imageData.data[i * 4] = displayValue;     // R
-                imageData.data[i * 4 + 1] = displayValue; // G
-                imageData.data[i * 4 + 2] = displayValue; // B
-                imageData.data[i * 4 + 3] = 255;          // A
-            }
-
-            // Create temporary canvas for scaling
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = slice.width;
-            tempCanvas.height = slice.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.putImageData(imageData, 0, 0);
-
-            // Scale to fit the display canvas with zoom and pan
-            const scaledWidth = slice.width * zoomLevel;
-            const scaledHeight = slice.height * zoomLevel;
-            const x = (canvasWidth - scaledWidth) / 2 + panOffset.x;
-            const y = (canvasHeight - scaledHeight) / 2 + panOffset.y;
-            
-            ctx.drawImage(tempCanvas, 0, 0, slice.width, slice.height, x, y, scaledWidth, scaledHeight);
-        }
-
-        function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, currentSlice, zoomLevel = 1.0, panOffset = { x: 0, y: 0 }) {
-            ctx.globalAlpha = 0.7;
-
-            selectedROIs.forEach(roiName => {
-                const roiData = rtstructContours[roiName];
-                if (!roiData || !roiData.contours) return;
-
-                const color = colorPalette[Array.from(selectedROIs).indexOf(roiName) % colorPalette.length];
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
-
-                // Get current slice Z position with better handling
-                let sliceZ = 0;
-                if (currentSlice.image_position && currentSlice.image_position.length >= 3) {
-                    sliceZ = parseFloat(currentSlice.image_position[2]);
-                } else if (currentSlice.slice_location) {
-                    sliceZ = parseFloat(currentSlice.slice_location);
-                }
-
-                // Use a larger tolerance for better ROI matching
-                const tolerance = 2.5; // Increased tolerance for slice matching
-
-                // Draw contours that match current slice
-                roiData.contours.forEach(contour => {
-                    if (contour.points && contour.points.length >= 3) {
-                        // Check if this contour is on the current slice
-                        const contourZ = parseFloat(contour.points[0][2]); // Use Z of first point
-
-                        if (Math.abs(contourZ - sliceZ) <= tolerance) {
-                            // Convert 3D points to 2D canvas coordinates with proper DICOM transformation
-                            const points2D = contour.points.map(point => {
-                                // Get CT image dimensions and transformation parameters
-                                const ctWidth = currentSlice.width;
-                                const ctHeight = currentSlice.height;
-                                const pixelSpacing = currentSlice.pixel_spacing || [1.0, 1.0];
-                                const imagePosition = currentSlice.image_position || [0, 0, 0];
-
-                                // DICOM patient coordinates (mm)
-                                let x = point[0];
-                                let y = point[1];
-
-                                // Convert patient coordinates to pixel coordinates
-                                // Formula: pixel = (patient - image_position) / pixel_spacing
-                                const pixelX = (x - imagePosition[0]) / pixelSpacing[0];
-                                const pixelY = (y - imagePosition[1]) / pixelSpacing[1];
-
-                                // Convert pixel coordinates to canvas coordinates with zoom and pan
-                                const scaledWidth = currentSlice.width * zoomLevel;
-                                const scaledHeight = currentSlice.height * zoomLevel;
-                                const baseX = (canvasWidth - scaledWidth) / 2 + panOffset.x;
-                                const baseY = (canvasHeight - scaledHeight) / 2 + panOffset.y;
-                                
-                                const canvasX = baseX + pixelX * zoomLevel;
-                                const canvasY = baseY + pixelY * zoomLevel;
-
-                                return [canvasX, canvasY];
-                            });
-
-                            // Filter out points that are outside canvas bounds
-                            const validPoints = points2D.filter(point =>
-                                point[0] >= 0 && point[0] <= canvasWidth &&
-                                point[1] >= 0 && point[1] <= canvasHeight
-                            );
-
-                            if (validPoints.length >= 3) {
-                                // Draw the contour
-                                ctx.beginPath();
-                                ctx.moveTo(validPoints[0][0], validPoints[0][1]);
-                                for (let i = 1; i < validPoints.length; i++) {
-                                    ctx.lineTo(validPoints[i][0], validPoints[i][1]);
-                                }
-                                ctx.closePath();
-                                ctx.stroke();
-
-                                // Add ROI label at the first valid point
-                                ctx.fillStyle = color;
-                                ctx.font = '12px Arial';
-                                const labelX = validPoints[0][0];
-                                const labelY = Math.max(10, validPoints[0][1] - 5); // Ensure label is visible
-                                ctx.fillText(roiName, labelX, labelY);
-                            }
-                        }
-                    }
-                });
-            });
-
-            ctx.globalAlpha = 1.0;
-        }
-
-        function toggleROI(roiName, index) {
-            const checkbox = document.getElementById(`roi_${index}`);
-
-            if (checkbox.checked) {
-                selectedROIs.add(roiName);
-            } else {
-                selectedROIs.delete(roiName);
-            }
-
-            displaySlice(); // Redraw with new ROI selection
-        }
-
-        function selectAllROIs() {
-            selectedROIs.clear();
-            commonStructures.forEach((structure, index) => {
-                selectedROIs.add(structure);
-                document.getElementById(`roi_${index}`).checked = true;
-            });
-            displaySlice();
-        }
-
-        function clearAllROIs() {
-            selectedROIs.clear();
-            commonStructures.forEach((structure, index) => {
-                document.getElementById(`roi_${index}`).checked = false;
-            });
-            displaySlice();
-        }
-
-        function previousSlice() {
-            if (currentSliceIndex > 0) {
-                currentSliceIndex--;
-                displaySlice();
-            }
-        }
-
-        function nextSlice() {
-            if (currentSliceIndex < ctData.length - 1) {
-                currentSliceIndex++;
-                displaySlice();
-            }
-        }
-
-        // Keyboard controls
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowUp') previousSlice();
-            if (e.key === 'ArrowDown') nextSlice();
-        });
-
-        // Zoom functions
-        function updateZoomLevel(viewer, newLevel) {
-            if (viewer === 1) {
-                zoomLevel1 = Math.max(0.1, Math.min(5.0, newLevel));
-            } else {
-                zoomLevel2 = Math.max(0.1, Math.min(5.0, newLevel));
-            }
-            displaySlice();
-        }
-
-        function zoomIn(viewer) {
-            updateZoomLevel(viewer, (viewer === 1 ? zoomLevel1 : zoomLevel2) * 1.25);
-        }
-
-        function zoomOut(viewer) {
-            updateZoomLevel(viewer, (viewer === 1 ? zoomLevel1 : zoomLevel2) / 1.25);
-        }
-
-        function resetZoom(viewer) {
-            if (viewer === 1) {
-                zoomLevel1 = 1.0;
-                panOffset1 = { x: 0, y: 0 };
-            } else {
-                zoomLevel2 = 1.0;
-                panOffset2 = { x: 0, y: 0 };
-            }
-            displaySlice();
-        }
-
-        function zoomBoth(direction) {
-            const multiplier = direction === 'in' ? 1.25 : 1/1.25;
-            updateZoomLevel(1, zoomLevel1 * multiplier);
-            updateZoomLevel(2, zoomLevel2 * multiplier);
-        }
-
-        function resetBothZoom() {
-            zoomLevel1 = 1.0;
-            zoomLevel2 = 1.0;
-            panOffset1 = { x: 0, y: 0 };
-            panOffset2 = { x: 0, y: 0 };
-            displaySlice();
-        }
-
-        function updateZoomDisplays() {
-            document.getElementById('zoom1').textContent = Math.round(zoomLevel1 * 100) + '%';
-            document.getElementById('zoom2').textContent = Math.round(zoomLevel2 * 100) + '%';
-        }
-
-        // Mouse event handlers for zoom and pan
-        function setupMouseHandlers() {
-            const canvas1 = document.getElementById('ctViewer1');
-            const canvas2 = document.getElementById('ctViewer2');
-
-            // Generic wheel handler for slice navigation
-            function handleWheel(e, viewer) {
-                e.preventDefault();
-                if (e.deltaY > 0) {
-                    nextSlice();
-                } else {
-                    previousSlice();
-                }
-            }
-
-            // Generic mouse drag handlers
-            function setupDragHandlers(canvas, viewer) {
-                let isDragging = false;
-                let dragStart = { x: 0, y: 0 };
-                let initialPanOffset = { x: 0, y: 0 };
-                const panOffset = viewer === 1 ? panOffset1 : panOffset2;
-
-                canvas.addEventListener('mousedown', (e) => {
-                    isDragging = true;
-                    dragStart = { x: e.clientX, y: e.clientY };
-                    initialPanOffset = { x: panOffset.x, y: panOffset.y };
-                    canvas.style.cursor = 'grabbing';
-                });
-
-                canvas.addEventListener('mousemove', (e) => {
-                    if (isDragging) {
-                        const deltaX = e.clientX - dragStart.x;
-                        const deltaY = e.clientY - dragStart.y;
-                        panOffset.x = initialPanOffset.x + deltaX;
-                        panOffset.y = initialPanOffset.y + deltaY;
-                        displaySlice();
-                    }
-                });
-
-                canvas.addEventListener('mouseup', () => {
-                    isDragging = false;
-                    canvas.style.cursor = 'grab';
-                });
-
-                canvas.addEventListener('mouseleave', () => {
-                    isDragging = false;
-                    canvas.style.cursor = 'default';
-                });
-
-                canvas.style.cursor = 'grab';
-            }
-
-            // Setup wheel events
-            canvas1.addEventListener('wheel', (e) => handleWheel(e, 1));
-            canvas2.addEventListener('wheel', (e) => handleWheel(e, 2));
-
-            // Setup drag events
-            setupDragHandlers(canvas1, 1);
-            setupDragHandlers(canvas2, 2);
-        }
-
-        // Initialize on load
-        window.onload = initializeViewer;
     </script>
+    <script src="{% static 'rtstructcompare/js/dicom_web_viewer.js' %}"></script>
 </body>
 
 </html>

@@ -206,4 +206,33 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Local environment
+struc-comp-env/
+.env
+.env.*
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+*.log
+.coverage
+
+# Local database
+db.sqlite3
+*.sqlite3
+*.sqlite3-journal
+
+# Collected/static build output (keep authored assets)
+staticfiles/
+
+# Editor/system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+tmp/
 *.sqlite3

@@ -11,8 +11,29 @@
 
 <body>
     <nav class="bg-teal-700 text-white p-4">
-        <div class="container mx-auto">
+        <div class="container mx-auto flex flex-wrap items-center justify-between gap-3">
             <a href="/" class="text-xl font-bold">Structure Comparision</a>
+            <div class="flex flex-wrap items-center gap-4 text-sm font-semibold">
+                {% if request.user.is_authenticated %}
+                    {% if request.user.is_staff %}
+                        <a href="{% url 'admin_dashboard' %}" class="hover:text-teal-100">Dashboard</a>
+                        <a href="{% url 'patients' %}" class="hover:text-teal-100">Patients</a>
+                        <a href="{% url 'admin:index' %}" class="hover:text-teal-100">Admin Panel</a>
+                    {% else %}
+                        <a href="{% url 'user_dashboard' %}" class="hover:text-teal-100">Dashboard</a>
+                        <a href="{% url 'patients' %}" class="hover:text-teal-100">Assigned Patients</a>
+                    {% endif %}
+                    <form method="post" action="{% url 'logout' %}" class="inline-flex">
+                        {% csrf_token %}
+                        <button type="submit" class="hover:text-teal-100 bg-transparent border-0 p-0 font-semibold">
+                            Logout
+                        </button>
+                    </form>
+                    <h3>Hi, {{ request.user.username }}</h3>
+                {% else %}
+                    <a href="{% url 'login' %}" class="hover:text-teal-100">Login</a>
+                {% endif %}
+            </div>
         </div>
     </nav>
     <main class="container mx-auto p-4">
