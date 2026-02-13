@@ -290,7 +290,12 @@ def populate_database(root_directory, clear_existing=False):
                         # Create RTStruct entry
                         rtstruct, created = RTStruct.objects.get_or_create(
                             rtstruct_instance_uid=series_uid,
-                            defaults={'series': instance}
+                            defaults={
+                                'series': series,
+                                'sop_instance_uid': sop_instance_uid,
+                                'structure_set_label': get_dicom_tag(ds, 'StructureSetLabel', ''),
+                                'structure_set_description': get_dicom_tag(ds, 'SeriesDescription', ''),
+                            }
                         )
                         if created:
                             stats['rtstructs'] += 1
@@ -300,7 +305,7 @@ def populate_database(root_directory, clear_existing=False):
                         if hasattr(ds, 'StructureSetROISequence'):
                             for roi_item in ds.StructureSetROISequence:
                                 roi_number = get_dicom_tag(roi_item, 'ROINumber', '')
-                                roi_name = get_dicom_tag(roi_item, 'ROIName', '')
+                                roi_label = get_dicom_tag(roi_item, 'ROIName', '')
                                 roi_description = get_dicom_tag(roi_item, 'ROIDescription', '')
                                 
                                 # Get ROI color from ROIContourSequence
@@ -317,7 +322,7 @@ def populate_database(root_directory, clear_existing=False):
                                     rtstruct=rtstruct,
                                     roi_id=str(roi_number),
                                     defaults={
-                                        'roi_name': roi_name,
+                                        'roi_label': roi_label,
                                         'roi_description': roi_description,
                                         'roi_color': roi_color,
                                     }
