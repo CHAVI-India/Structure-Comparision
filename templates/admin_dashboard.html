@@ -39,8 +39,8 @@
         <div class="section-header">
             <h2>Assign Patients</h2>
             <div class="assignment-toggle" role="tablist" aria-label="Assignment Mode">
-                <button type="button" id="userBtn" class="btn btn-toggle is-active" role="tab" aria-selected="true">User</button>
-                <button type="button" id="groupBtn" class="btn btn-toggle" role="tab" aria-selected="false">Group</button>
+                <button type="button" id="userBtn" class="btn btn-toggle" role="tab" aria-selected="false">User</button>
+                <button type="button" id="groupBtn" class="btn btn-toggle is-active" role="tab" aria-selected="true">Group</button>
             </div>
             <a class="btn btn-secondary" href="{% url 'patients' %}">View Patient Page</a>
         </div>
@@ -52,66 +52,193 @@
             </div>
         {% endif %}
 
-        <div id="userAssignment" class="assignment-view is-active" aria-labelledby="userBtn">
-        <form method="post" class="panel-form">
-            {% csrf_token %}
-            <div class="grid-2">
-                <div class="form-control">
-                    <div class="flex items-center justify-between">
-                        <label for="user_ids" class="label-inline">Select Users</label>
-                        <div class="group-toolbar" id="groupToolbar">
-                            <button type="button" class="group-trigger" id="groupTrigger">
-                                Group: <span id="selectedGroupLabel">No group</span> ▾
-                            </button>
-                            <button type="button" class="btn btn-secondary btn-xs" id="openGroupModal">+ Create Group</button>
-                            <div class="group-dropdown" id="groupDropdown">
+        <div id="groupAssignment" class="assignment-view is-active" aria-labelledby="groupBtn">
+            <div class="group-assignment-shell">
+                <div class="group-assignment-header flex items-center justify-between mb-4">
+                    <div>
+                        <h3 style="margin:0;font-size:1.4rem;color:#0f172a;">Bulk group assignment</h3>
+                        <p style="margin:6px 0 0;color:#475569;font-size:0.95rem;">Select one or more groups on the left, then pair them with patients on the right.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary group-modal-trigger" id="openGroupModal" style="border-radius:999px;padding:10px 18px;font-weight:600;">+ Create Group</button>
+                </div>
+
+                <form method="post" class="group-bulk-form" style="display:flex;flex-direction:column;gap:20px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assign_groups">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;align-items:start;">
+                        <section aria-label="Select groups" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:100%;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Groups</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose the groups to receive patients.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ assignment_groups|length }} total</span>
+                            </div>
+                            <input type="text" id="bulk_group_search" class="bulk-filter" placeholder="Filter groups by name or description" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;width:100%;">
+                            <div id="bulkGroupList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
                                 {% if assignment_groups %}
                                     {% for group in assignment_groups %}
-                                        <button type="button" class="group-option" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}">
-                                            <div class="group-option-name">{{ group.name }}</div>
-                                            <div class="group-option-meta">
-                                                {{ group.users.all|length }} users
-                                                {% if group.description %} · {{ group.description|truncatechars:40 }}{% endif %}
+                                        <label class="group-bulk-item" data-label="{{ group.name|lower }} {{ group.description|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.06);">
+                                            <input type="checkbox" name="bulk_group_ids" value="{{ group.id }}" style="width:16px;height:16px;">
+                                            <div>
+                                                <div class="group-bulk-name" style="font-weight:600;color:#0f172a;">{{ group.name }}</div>
+                                                <div class="group-bulk-meta" style="font-size:0.82rem;color:#64748b;">
+                                                    {{ group.users.count }} user{{ group.users.count|pluralize }} · {{ group.grouppatientassignment_set.count }} patient{{ group.grouppatientassignment_set.count|pluralize }}
+                                                </div>
                                             </div>
-                                        </button>
+                                            <div class="flex gap-2">
+                                                <button type="button"
+                                                    class="btn btn-outline btn-xs delete-group-btn"
+                                                    data-group-id="{{ group.id }}"
+                                                    data-group-name="{{ group.name }}"
+                                                    style="padding:6px 10px; color:#9f1239; border-radius:999px;font-size:0.8rem;">
+                                                    Delete
+                                                </button>
+                                                <button type="button"
+                                                    class="btn btn-outline btn-xs edit-group"
+                                                    data-group-id="{{ group.id }}"
+                                                    data-group-name="{{ group.name }}"
+                                                    data-group-description="{{ group.description }}"
+                                                    data-group-users="{% for user in group.users.all %}{{ user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                                                    style="padding:6px 10px; color:#0f766e; border-radius:999px;font-size:0.8rem;">
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        </label>
                                     {% endfor %}
                                 {% else %}
-                                    <div class="group-empty">No groups yet. Create one to assign faster.</div>
+                                    <div class="empty-panel">
+                                        <p class="empty-panel__title">No groups yet</p>
+                                        <p class="empty-panel__subtitle">Create a group to begin assignments.</p>
+                                        <button type="button" class="btn btn-primary group-modal-trigger" id="openGroupModalGroupEmpty">Start a Group</button>
+                                    </div>
                                 {% endif %}
-                                <button type="button" class="group-clear" id="clearGroupSelection">Clear group selection</button>
+                            </div>
+                        </section>
+
+                        <section aria-label="Select patients" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:100%;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Patients</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose one or more patients to assign.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ patients|length }} total</span>
+                            </div>
+                            <input type="text" id="bulk_patient_search" class="bulk-filter" placeholder="Filter patients by ID or name" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;width:100%;">
+                            <div id="bulkPatientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+                                {% if patients %}
+                                    {% for patient in patients %}
+                                        <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.05);">
+                                            <input type="checkbox" name="bulk_patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
+                                            <div>
+                                                <div class="group-bulk-name" style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
+                                                <div class="group-bulk-meta" style="font-size:0.82rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                            </div>
+                                        </label>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="empty-panel">
+                                        <p class="empty-panel__title">No patients available</p>
+                                        <p class="empty-panel__subtitle">Upload DICOM studies to start.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </section>
+                    </div>
+                    <div class="form-actions" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                        <div class="helper-text" style="color:#475569;font-size:0.9rem;">Each selected patient is linked to every selected group.</div>
+                        <button class="btn btn-primary" type="submit" style="padding:12px 22px;border-radius:16px;font-weight:600;">Assign Patients to Selected Groups</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="userAssignment" class="assignment-view" aria-labelledby="userBtn">
+            <form method="post" class="panel-form">
+                <div class="mb-4">
+                        <h3 style="margin:0;font-size:1.4rem;color:#0f172a;">Bulk User assignment</h3>
+                        <p style="margin:6px 0 0;color:#475569;font-size:0.95rem;">Select one or more users on the left, then pair them with patients on the right.</p>
+                    </div>
+                {% csrf_token %}
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;">
+                    <div class="form-control" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Users</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose the users to receive patients.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ assignment_groups|length }} total</span>
+                            </div>
+                            <div class="group-toolbar" id="groupToolbar" style="position:relative;">
+                                <div class="group-dropdown" id="groupDropdown" style="position:absolute;right:0;top:110%;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:12px;box-shadow:0 18px 35px rgba(15,23,42,0.15);width:280px;display:none;flex-direction:column;gap:8px;z-index:10;">
+                                    {% if assignment_groups %}
+                                        {% for group in assignment_groups %}
+                                            <button type="button" class="group-option" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" style="text-align:left;border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;background:#f8fafc;">
+                                                <div class="group-option-name" style="font-weight:600;color:#0f172a;">{{ group.name }}</div>
+                                                <div class="group-option-meta" style="font-size:0.8rem;color:#64748b;">
+                                                    {{ group.users.all|length }} users
+                                                    {% if group.description %} · {{ group.description|truncatechars:40 }}{% endif %}
+                                                </div>
+                                            </button>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="group-empty" style="text-align:center;color:#94a3b8;">No groups yet. Create one to assign faster.</div>
+                                    {% endif %}
+                                    <button type="button" class="group-clear" id="clearGroupSelection" style="border:none;background:none;color:#ef4444;font-weight:600;">Clear group selection</button>
+                                </div>
                             </div>
                         </div>
+                        <input type="hidden" name="group_id" id="group_id">
+                        <input type="text" id="user_search" name="user_search" placeholder="Search users by username or email" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;">
+                        <div id="userList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+                            {% if users %}
+                                {% for user in users %}
+                                    <label data-label="{{ user.username|lower }} {{ user.email|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
+                                        <input type="checkbox" name="user_ids" value="{{ user.id }}" style="width:16px;height:16px;">
+                                        <div>
+                                            <div style="font-weight:600;color:#0f172a;">{{ user.username }}</div>
+                                            <div style="font-size:0.8rem;color:#94a3b8;">{{ user.email|default:'no email on file' }}</div>
+                                        </div>
+                                    </label>
+                                {% endfor %}
+                            {% else %}
+                                <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No users available.</div>
+                            {% endif %}
+                        </div>
                     </div>
-                    <input type="hidden" name="group_id" id="group_id">
-                    <!-- <div class="helper-text">Assigning a group will include every user inside it.</div> -->
-                    <input type="text" id="user_search" name="user_search" placeholder="Search users by username or email">
-                    <div class="helper-text">Type to filter the list below.</div>
-                    <select id="user_ids" name="user_ids" multiple size="6">
-                        <option value="" disabled>Choose user(s)</option>
-                        {% for user in users %}
-                            <option value="{{ user.id }}">{{ user.username }}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="helper-text">*Hold Ctrl (Cmd on Mac) to select multiple users or patients.</div>
+                    <div class="form-control" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Patients</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose one or more patients to assign.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ assignment_groups|length }} total</span>
+                            </div>
+                        <input type="text" id="patient_search" name="patient_search" placeholder="Search patients by ID or name" style="border:1px solid #cbd5f5;color:#0f172a;border-radius:14px;padding:10px 14px;font-size:0.9rem;background:#ffffff;">
+                        <div id="patientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+                            {% if patients %}
+                                {% for patient in patients %}
+                                    <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
+                                        <input type="checkbox" name="patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
+                                        <div>
+                                            <div style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
+                                            <div style="font-size:0.8rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                        </div>
+                                    </label>
+                                {% endfor %}
+                            {% else %}
+                                <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No patients available.</div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-                <div class="form-control">
-                    <label for="patient_ids">Select Patients</label>
-                    <input type="text" id="patient_search" name="patient_search" placeholder="Search patients by ID or name">
-                    <div class="helper-text">Type to filter the list below.</div>
-                    <select id="patient_ids" name="patient_ids" multiple size="6" required>
-                        {% for patient in patients %}
-                            <option value="{{ patient.id }}">
-                                {{ patient.patient_id }}{% if patient.patient_name %} — {{ patient.patient_name }}{% endif %}
-                            </option>
-                        {% endfor %}
-                    </select>
+                <div class="form-actions" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" type="submit" name="action" value="assign" style="padding:10px 24px;border-radius:16px;font-weight:600;">Assign</button>
+                    <button class="btn btn-danger" type="submit" name="action" value="unassign" style="padding:10px 24px;border-radius:16px;font-weight:600;">Unassign</button>
                 </div>
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-primary" type="submit" name="action" value="assign">Assign</button>
-                <button class="btn btn-danger" type="submit" name="action" value="unassign">Unassign</button>
-            </div>
-        </form>
+            </form>
+        </div>
     </section>
 
     <section class="panel">
@@ -238,6 +365,12 @@
     </section>
 </div>
 
+<form id="deleteGroupForm" method="post" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="delete_group">
+    <input type="hidden" name="group_id" id="delete_group_id">
+</form>
+
 <div class="modal-backdrop" id="groupModal" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
         <div class="modal-header">
@@ -274,68 +407,137 @@
     </div>
 </div>
 <script>
-document.getElementById('userBtn').addEventListener('click', function() {
-    document.getElementById('userAssignment').style.display = 'block';
-    document.getElementById('groupAssignment').style.display = 'none';
-    this.classList.add('btn-primary');
-    this.classList.remove('btn-secondary');
-    document.getElementById('groupBtn').classList.add('btn-secondary');
-    document.getElementById('groupBtn').classList.remove('btn-primary');
-});
+document.addEventListener('DOMContentLoaded', function () {
+    const userBtn = document.getElementById('userBtn');
+    const groupBtn = document.getElementById('groupBtn');
+    const userAssignment = document.getElementById('userAssignment');
+    const groupAssignment = document.getElementById('groupAssignment');
+    const groupModal = document.getElementById('groupModal');
 
-document.getElementById('groupBtn').addEventListener('click', function() {
-    document.getElementById('userAssignment').style.display = 'none';
-    document.getElementById('groupAssignment').style.display = 'block';
-    this.classList.add('btn-primary');
-    this.classList.remove('btn-secondary');
-    document.getElementById('userBtn').classList.add('btn-secondary');
-    document.getElementById('userBtn').classList.remove('btn-primary');
-});
+    const setAssignmentView = (target) => {
+        if (!userBtn || !groupBtn || !userAssignment || !groupAssignment) {
+            return;
+        }
+        const showGroup = target === 'group';
+        userAssignment.classList.toggle('is-active', !showGroup);
+        groupAssignment.classList.toggle('is-active', showGroup);
+        userAssignment.hidden = showGroup;
+        groupAssignment.hidden = !showGroup;
 
-function openModalForCreate() {
-    document.getElementById('groupModalTitle').textContent = 'Create Assignment Group';
-    document.getElementById('modal_action').value = 'create_group';
-    document.getElementById('modal_group_id').value = '';
-    document.getElementById('group_name').value = '';
-    document.getElementById('group_description').value = '';
-    document.getElementById('modal_submit_btn').textContent = 'Create Group';
-    // reset users select
-    const select = document.getElementById('group_user_ids');
-    for (let option of select.options) {
-        option.selected = false;
+        userBtn.classList.toggle('is-active', !showGroup);
+        groupBtn.classList.toggle('is-active', showGroup);
+        userBtn.setAttribute('aria-selected', (!showGroup).toString());
+        groupBtn.setAttribute('aria-selected', showGroup.toString());
+    };
+
+    if (userBtn && groupBtn) {
+        userBtn.addEventListener('click', () => setAssignmentView('user'));
+        groupBtn.addEventListener('click', () => setAssignmentView('group'));
+        // Initialize default state to group view on load
+        setAssignmentView('group');
     }
-    document.getElementById('groupModal').setAttribute('aria-hidden', 'false');
-}
 
-document.getElementById('openGroupModal').addEventListener('click', openModalForCreate);
-document.getElementById('openGroupModalGroup').addEventListener('click', openModalForCreate);
+    const showGroupModal = () => {
+        if (!groupModal) return;
+        groupModal.classList.add('show');
+        groupModal.setAttribute('aria-hidden', 'false');
+    };
 
-document.getElementById('closeGroupModal').addEventListener('click', function() {
-    document.getElementById('groupModal').setAttribute('aria-hidden', 'true');
-});
+    const hideGroupModal = () => {
+        if (!groupModal) return;
+        groupModal.classList.remove('show');
+        groupModal.setAttribute('aria-hidden', 'true');
+    };
 
-document.getElementById('cancelGroupModal').addEventListener('click', function() {
-    document.getElementById('groupModal').setAttribute('aria-hidden', 'true');
-});
-
-document.querySelectorAll('.edit-group').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const groupId = this.dataset.groupId;
-        const groupName = this.dataset.groupName;
-        const groupDescription = this.dataset.groupDescription;
-        const groupUsers = this.dataset.groupUsers.split(',');
-        document.getElementById('groupModalTitle').textContent = 'Edit Assignment Group';
-        document.getElementById('modal_action').value = 'edit_group';
-        document.getElementById('modal_group_id').value = groupId;
-        document.getElementById('group_name').value = groupName;
-        document.getElementById('group_description').value = groupDescription;
-        document.getElementById('modal_submit_btn').textContent = 'Update Group';
-        // select users
+    function openModalForCreate() {
+        document.getElementById('groupModalTitle').textContent = 'Create Assignment Group';
+        document.getElementById('modal_action').value = 'create_group';
+        document.getElementById('modal_group_id').value = '';
+        document.getElementById('group_name').value = '';
+        document.getElementById('group_description').value = '';
+        document.getElementById('modal_submit_btn').textContent = 'Create Group';
         const select = document.getElementById('group_user_ids');
         for (let option of select.options) {
-            option.selected = groupUsers.includes(option.value);
+            option.selected = false;
         }
-        document.getElementById('groupModal').setAttribute('aria-hidden', 'false');
+        showGroupModal();
+    }
+
+    const openGroupModalBtn = document.getElementById('openGroupModal');
+    if (openGroupModalBtn) {
+        openGroupModalBtn.addEventListener('click', openModalForCreate);
+    }
+
+    const openGroupModalGroupBtn = document.getElementById('openGroupModalGroup');
+    if (openGroupModalGroupBtn) {
+        openGroupModalGroupBtn.addEventListener('click', openModalForCreate);
+    }
+
+    const emptyTrigger = document.getElementById('openGroupModalGroupEmpty');
+    if (emptyTrigger) {
+        emptyTrigger.addEventListener('click', openModalForCreate);
+    }
+
+    const closeGroupModalBtn = document.getElementById('closeGroupModal');
+    if (closeGroupModalBtn) {
+        closeGroupModalBtn.addEventListener('click', hideGroupModal);
+    }
+
+    const cancelGroupModalBtn = document.getElementById('cancelGroupModal');
+    if (cancelGroupModalBtn) {
+        cancelGroupModalBtn.addEventListener('click', hideGroupModal);
+    }
+
+    if (groupModal) {
+        groupModal.addEventListener('click', function (event) {
+            if (event.target === groupModal) {
+                hideGroupModal();
+            }
+        });
+    }
+
+    document.querySelectorAll('.edit-group').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const groupId = this.dataset.groupId;
+            const groupName = this.dataset.groupName;
+            const groupDescription = this.dataset.groupDescription;
+            const groupUsers = (this.dataset.groupUsers || '')
+                .split(',')
+                .map(id => id.trim())
+                .filter(id => id.length);
+            document.getElementById('groupModalTitle').textContent = 'Edit Assignment Group';
+            document.getElementById('modal_action').value = 'edit_group';
+            document.getElementById('modal_group_id').value = groupId;
+            document.getElementById('group_name').value = groupName;
+            document.getElementById('group_description').value = groupDescription;
+            document.getElementById('modal_submit_btn').textContent = 'Update Group';
+            // select users
+            const select = document.getElementById('group_user_ids');
+            for (let option of select.options) {
+                option.selected = groupUsers.includes(option.value);
+            }
+            showGroupModal();
+        });
+    });
+
+    const deleteGroupForm = document.getElementById('deleteGroupForm');
+    const deleteGroupIdInput = document.getElementById('delete_group_id');
+    document.querySelectorAll('.delete-group-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const groupName = this.dataset.groupName || 'this group';
+            const groupId = this.dataset.groupId;
+            if (!groupId) {
+                return;
+            }
+            const confirmed = window.confirm(`Delete "${groupName}"? This will remove all assignments for this group.`);
+            if (!confirmed) {
+                return;
+            }
+            if (deleteGroupForm && deleteGroupIdInput) {
+                deleteGroupIdInput.value = groupId;
+                deleteGroupForm.submit();
+            }
+        });
     });
 });
 </script>

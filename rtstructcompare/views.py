@@ -288,6 +288,93 @@ def admin_dashboard(request):
                         group.users.set(User.objects.filter(id__in=group_user_ids))
                     status_message = f'Group "{group.name}" created.'
                     status_type = 'success'
+        elif action == 'edit_group':
+            group_id = (request.POST.get('group_id') or '').strip()
+            group_name = (request.POST.get('group_name') or '').strip()
+            group_description = (request.POST.get('group_description') or '').strip()
+            group_user_ids = request.POST.getlist('group_user_ids')
+
+            if not group_id:
+                status_message = 'Select a group to edit.'
+                status_type = 'error'
+            else:
+                group = AssignmentGroup.objects.filter(id=group_id, created_by=request.user).first()
+                if not group:
+                    status_message = 'Group not found or access denied.'
+                    status_type = 'error'
+                elif not group_name:
+                    status_message = 'Group name is required.'
+                    status_type = 'error'
+                elif not group_user_ids:
+                    status_message = 'Select at least one user for the group.'
+                    status_type = 'error'
+                elif AssignmentGroup.objects.filter(name=group_name, created_by=request.user).exclude(id=group.id).exists():
+                    status_message = 'Another group with this name already exists.'
+                    status_type = 'error'
+                else:
+                    group.name = group_name
+                    group.description = group_description
+                    group.save(update_fields=['name', 'description', 'updated_at'])
+                    group.users.set(User.objects.filter(id__in=group_user_ids))
+                    status_message = f'Group "{group.name}" updated.'
+                    status_type = 'success'
+        elif action == 'delete_group':
+            group_id = (request.POST.get('group_id') or '').strip()
+            if not group_id:
+                status_message = 'Select a group to delete.'
+                status_type = 'error'
+            else:
+                group = AssignmentGroup.objects.filter(id=group_id, created_by=request.user).first()
+                if not group:
+                    status_message = 'Group not found or access denied.'
+                    status_type = 'error'
+                else:
+                    group_name = group.name
+                    group.delete()
+                    status_message = f'Group "{group_name}" deleted.'
+                    status_type = 'success'
+        elif action == 'assign_groups':
+            bulk_group_ids = request.POST.getlist('bulk_group_ids')
+            bulk_patient_ids = request.POST.getlist('bulk_patient_ids')
+
+            if not bulk_group_ids or not bulk_patient_ids:
+                status_message = 'Select at least one group and one patient.'
+                status_type = 'error'
+            else:
+                groups = list(
+                    AssignmentGroup.objects.filter(id__in=bulk_group_ids, created_by=request.user).prefetch_related('users')
+                )
+                if len(groups) != len(set(bulk_group_ids)):
+                    status_message = 'One or more selected groups could not be found.'
+                    status_type = 'error'
+                else:
+                    empty_groups = [group.name for group in groups if not group.users.exists()]
+                    if empty_groups:
+                        status_message = (
+                            'Add users to these groups before assigning patients: '
+                            + ', '.join(empty_groups)
+                        )
+                        status_type = 'error'
+                    else:
+                        patients = list(Patient.objects.filter(id__in=bulk_patient_ids))
+                        if not patients:
+                            status_message = 'No valid patients selected.'
+                            status_type = 'error'
+                        else:
+                            created_count = 0
+                            for group in groups:
+                                for patient in patients:
+                                    _, created = GroupPatientAssignment.objects.get_or_create(
+                                        group=group,
+                                        patient=patient
+                                    )
+                                    if created:
+                                        created_count += 1
+                            status_message = (
+                                f'Assigned {len(patients)} patient(s) across {len(groups)} group(s). '
+                                f'Created {created_count} new group assignment(s).'
+                            )
+                            status_type = 'success'
         elif action in {'assign', 'unassign'}:
             if not patient_ids or (not user_ids and not group_id):
                 status_message = 'Select at least one user or a group, and at least one patient.'
@@ -667,7 +754,13 @@ def dicom_web_viewer(request, patient_uuid=None):
                 assignment = PatientAssignment.objects.select_related('patient').filter(
                     user=request.user
                 ).first()
-                first_patient = assignment.patient if assignment else None
+                if assignment:
+                    first_patient = assignment.patient
+                else:
+                    group_assignment = GroupPatientAssignment.objects.select_related('patient').filter(
+                        group__users=request.user
+                    ).first()
+                    first_patient = group_assignment.patient if group_assignment else None
 
             if first_patient:
                 patient_uuid = first_patient.id
@@ -678,11 +771,17 @@ def dicom_web_viewer(request, patient_uuid=None):
         
         patient = get_object_or_404(Patient, id=patient_uuid)
 
-        if not is_admin_user(request.user) and not PatientAssignment.objects.filter(
-            user=request.user,
-            patient=patient
-        ).exists():
-            return HttpResponseForbidden('You are not assigned to this patient.')
+        if not is_admin_user(request.user):
+            has_direct_assignment = PatientAssignment.objects.filter(
+                user=request.user,
+                patient=patient
+            ).exists()
+            has_group_assignment = GroupPatientAssignment.objects.filter(
+                patient=patient,
+                group__users=request.user
+            ).exists()
+            if not (has_direct_assignment or has_group_assignment):
+                return HttpResponseForbidden('You are not assigned to this patient.')
         
         studies = DICOMStudy.objects.filter(patient=patient)
         
