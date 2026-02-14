@@ -65,10 +65,10 @@ class DICOMSeriesAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Series Information', {
-            'fields': ('id', 'study', 'dicom_instance_uid', 'series_instance_uid')
+            'fields': ('id', 'study', 'series_instance_uid')
         }),
         ('Series Details', {
-            'fields': ('series_description', 'series_date', 'instance_count', 'frame_of_reference_uid')
+            'fields': ('series_description', 'series_date', 'instance_count', 'frame_of_reference_uid', 'modality')
         }),
         ('File Paths', {
             'fields': ('series_root_path',)
@@ -86,29 +86,26 @@ class DICOMSeriesAdmin(admin.ModelAdmin):
 @admin.register(DICOMInstance)
 class DICOMInstanceAdmin(admin.ModelAdmin):
     """Admin interface for DICOMInstance model"""
-    list_display = ('sop_instance_uid', 'modality', 'instance_path_short', 'created_at')
-    list_filter = ('modality', 'created_at', 'updated_at')
-    search_fields = ('sop_instance_uid', 'instance_path')
+    list_display = ('sop_instance_uid', 'series', 'instance_number', 'instance_path_short', 'created_at')
+    list_filter = ('series__modality', 'created_at', 'updated_at')
+    search_fields = ('sop_instance_uid', 'instance_path', 'series__series_instance_uid')
     readonly_fields = ('id', 'created_at', 'updated_at')
     ordering = ('-created_at',)
     
     fieldsets = (
         ('Instance Information', {
-            'fields': ('id', 'sop_instance_uid', 'modality')
+            'fields': ('id', 'series', 'sop_instance_uid', 'instance_number')
         }),
         ('File Information', {
             'fields': ('instance_path',)
-        }),
-        ('Binary Content', {
-            'fields': ('file_content',),
-            'classes': ('collapse',),
-            'description': 'Binary DICOM file content (if stored in database)'
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+    
+    autocomplete_fields = ['series']
     
     def instance_path_short(self, obj):
         """Display shortened instance path"""
@@ -124,15 +121,15 @@ class DICOMInstanceAdmin(admin.ModelAdmin):
 @admin.register(RTStruct)
 class RTStructAdmin(admin.ModelAdmin):
     """Admin interface for RTStruct model"""
-    list_display = ('rtstruct_instance_uid', 'series', 'created_at', 'updated_at')
+    list_display = ('referenced_series_uid', 'instance', 'created_at', 'updated_at')
     list_filter = ('created_at', 'updated_at')
-    search_fields = ('rtstruct_instance_uid', 'series__sop_instance_uid')
+    search_fields = ('referenced_series_uid', 'instance__sop_instance_uid')
     readonly_fields = ('id', 'created_at', 'updated_at')
     ordering = ('-created_at',)
     
     fieldsets = (
         ('RTStruct Information', {
-            'fields': ('id', 'series', 'rtstruct_instance_uid')
+            'fields': ('id', 'instance', 'referenced_series_uid')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -146,7 +143,7 @@ class RoiAdmin(admin.ModelAdmin):
     """Admin interface for ROI (Region of Interest) model"""
     list_display = ('roi_label', 'roi_id', 'rtstruct', 'roi_color', 'roi_description')
     list_filter = ('rtstruct',)
-    search_fields = ('roi_label', 'roi_id', 'roi_description', 'rtstruct__rtstruct_instance_uid')
+    search_fields = ('roi_label', 'roi_id', 'roi_description', 'rtstruct__referenced_series_uid')
     readonly_fields = ('id',)
     
     fieldsets = (
@@ -165,13 +162,13 @@ class RoiAdmin(admin.ModelAdmin):
 @admin.register(Feedback)
 class FeedbackAdmin(admin.ModelAdmin):
     """Admin interface for Feedback model"""
-    list_display = ('id', 'user', 'patient', 'roi', 'roi_label', 'rt1_rating', 'rt2_rating', 'comment', 'created_at', 'updated_at')
+    list_display = ('id', 'user', 'patient', 'roi_rt1', 'roi_rt2', 'common_roi_label', 'rt1_rating', 'rt2_rating', 'comment', 'created_at', 'updated_at')
     list_filter = ('rt1_rating', 'rt2_rating', 'created_at', 'updated_at')
     search_fields = (
         'user__username',
         'patient__patient_id',
         'patient__patient_name',
-        'roi__roi_label',
+        'roi_rt1__roi_label',
         'comment'
     )
     readonly_fields = ('id', 'created_at', 'updated_at')
@@ -179,7 +176,7 @@ class FeedbackAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Feedback Information', {
-            'fields': ('id', 'user', 'patient', 'roi', 'roi_label', 'rt1_rating', 'rt2_rating')
+            'fields': ('id', 'user', 'patient', 'roi_rt1', 'roi_rt2', 'roi_label', 'rt1_rating', 'rt2_rating')
         }),
         ('Details', {
             'fields': ('comment',)
@@ -190,7 +187,7 @@ class FeedbackAdmin(admin.ModelAdmin):
         }),
     )
 
-    autocomplete_fields = ['user', 'patient', 'roi']
+    autocomplete_fields = ['user', 'patient', 'roi_rt1', 'roi_rt2']
 
 
 

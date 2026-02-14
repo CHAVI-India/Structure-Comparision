@@ -38,6 +38,10 @@
     <section class="panel">
         <div class="section-header">
             <h2>Assign Patients</h2>
+            <div class="assignment-toggle" role="tablist" aria-label="Assignment Mode">
+                <button type="button" id="userBtn" class="btn btn-toggle is-active" role="tab" aria-selected="true">User</button>
+                <button type="button" id="groupBtn" class="btn btn-toggle" role="tab" aria-selected="false">Group</button>
+            </div>
             <a class="btn btn-secondary" href="{% url 'patients' %}">View Patient Page</a>
         </div>
 
@@ -48,7 +52,8 @@
             </div>
         {% endif %}
 
-        <form method="post">
+        <div id="userAssignment" class="assignment-view is-active" aria-labelledby="userBtn">
+        <form method="post" class="panel-form">
             {% csrf_token %}
             <div class="grid-2">
                 <div class="form-control">
@@ -214,7 +219,7 @@
                         <tr>
                             <td>{{ feedback.user.username }}</td>
                             <td>{{ feedback.patient.patient_id }}</td>
-                            <td>{% if feedback.roi %}{{ feedback.roi.roi_name }}{% else %}{{ feedback.roi_name|default:"—" }}{% endif %}</td>
+                            <td>{% if feedback.roi %}{{ feedback.roi.roi_label }}{% else %}{{ feedback.common_roi_label|default:"—" }}{% endif %}</td>
                             <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
                             <td>{{ feedback.rt1_rating|default:"—" }}</td>
                             <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
@@ -241,7 +246,8 @@
         </div>
         <form method="post">
             {% csrf_token %}
-            <input type="hidden" name="action" value="create_group">
+            <input type="hidden" name="action" id="modal_action" value="create_group">
+            <input type="hidden" name="group_id" id="modal_group_id">
             <div class="form-control">
                 <label for="group_name">Group Name</label>
                 <input type="text" id="group_name" name="group_name" placeholder="e.g. Breast QA Team" required>
@@ -262,9 +268,75 @@
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" id="cancelGroupModal">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create Group</button>
+                <button type="submit" class="btn btn-primary" id="modal_submit_btn">Create Group</button>
             </div>
         </form>
     </div>
 </div>
+<script>
+document.getElementById('userBtn').addEventListener('click', function() {
+    document.getElementById('userAssignment').style.display = 'block';
+    document.getElementById('groupAssignment').style.display = 'none';
+    this.classList.add('btn-primary');
+    this.classList.remove('btn-secondary');
+    document.getElementById('groupBtn').classList.add('btn-secondary');
+    document.getElementById('groupBtn').classList.remove('btn-primary');
+});
+
+document.getElementById('groupBtn').addEventListener('click', function() {
+    document.getElementById('userAssignment').style.display = 'none';
+    document.getElementById('groupAssignment').style.display = 'block';
+    this.classList.add('btn-primary');
+    this.classList.remove('btn-secondary');
+    document.getElementById('userBtn').classList.add('btn-secondary');
+    document.getElementById('userBtn').classList.remove('btn-primary');
+});
+
+function openModalForCreate() {
+    document.getElementById('groupModalTitle').textContent = 'Create Assignment Group';
+    document.getElementById('modal_action').value = 'create_group';
+    document.getElementById('modal_group_id').value = '';
+    document.getElementById('group_name').value = '';
+    document.getElementById('group_description').value = '';
+    document.getElementById('modal_submit_btn').textContent = 'Create Group';
+    // reset users select
+    const select = document.getElementById('group_user_ids');
+    for (let option of select.options) {
+        option.selected = false;
+    }
+    document.getElementById('groupModal').setAttribute('aria-hidden', 'false');
+}
+
+document.getElementById('openGroupModal').addEventListener('click', openModalForCreate);
+document.getElementById('openGroupModalGroup').addEventListener('click', openModalForCreate);
+
+document.getElementById('closeGroupModal').addEventListener('click', function() {
+    document.getElementById('groupModal').setAttribute('aria-hidden', 'true');
+});
+
+document.getElementById('cancelGroupModal').addEventListener('click', function() {
+    document.getElementById('groupModal').setAttribute('aria-hidden', 'true');
+});
+
+document.querySelectorAll('.edit-group').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const groupId = this.dataset.groupId;
+        const groupName = this.dataset.groupName;
+        const groupDescription = this.dataset.groupDescription;
+        const groupUsers = this.dataset.groupUsers.split(',');
+        document.getElementById('groupModalTitle').textContent = 'Edit Assignment Group';
+        document.getElementById('modal_action').value = 'edit_group';
+        document.getElementById('modal_group_id').value = groupId;
+        document.getElementById('group_name').value = groupName;
+        document.getElementById('group_description').value = groupDescription;
+        document.getElementById('modal_submit_btn').textContent = 'Update Group';
+        // select users
+        const select = document.getElementById('group_user_ids');
+        for (let option of select.options) {
+            option.selected = groupUsers.includes(option.value);
+        }
+        document.getElementById('groupModal').setAttribute('aria-hidden', 'false');
+    });
+});
+</script>
 {% endblock %}

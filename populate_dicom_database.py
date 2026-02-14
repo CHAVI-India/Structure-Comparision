@@ -223,35 +223,6 @@ def populate_database(root_directory, clear_existing=False):
                 
                 # === INSTANCE (must be created before Series due to FK) ===
                 sop_instance_uid = get_dicom_tag(ds, 'SOPInstanceUID')
-                if not sop_instance_uid:
-                    print(f"  ✗ Skipping {file_path.name}: No SOPInstanceUID")
-                    stats['errors'] += 1
-                    continue
-                
-                # Read file content for storage (COMMENTED OUT - saves disk space)
-                # Storing file_content in database can make it very large
-                # We rely on instance_path instead
-                # with open(file_path, 'rb') as f:
-                #     file_content = f.read()
-                
-                # Get modality
-                modality = get_dicom_tag(ds, 'Modality', '')
-                
-                if sop_instance_uid not in created_instances:
-                    instance, created = DICOMInstance.objects.get_or_create(
-                        sop_instance_uid=sop_instance_uid,
-                        defaults={
-                            'instance_path': str(file_path),
-                            # 'file_content': file_content,  # COMMENTED OUT - saves disk space
-                            'modality': modality,
-                        }
-                    )
-                    created_instances[sop_instance_uid] = instance
-                    if created:
-                        stats['instances'] += 1
-                else:
-                    instance = created_instances[sop_instance_uid]
-                
                 # === SERIES ===
                 series_uid = get_dicom_tag(ds, 'SeriesInstanceUID')
                 if not series_uid:
@@ -264,7 +235,6 @@ def populate_database(root_directory, clear_existing=False):
                         series_instance_uid=series_uid,
                         defaults={
                             'study': study,
-                            'dicom_instance_uid': instance,  # Link to first instance
                             'series_description': get_dicom_tag(ds, 'SeriesDescription', ''),
                             'series_root_path': str(file_path.parent),
                             'frame_of_reference_uid': get_dicom_tag(ds, 'FrameOfReferenceUID', ''),
@@ -282,6 +252,31 @@ def populate_database(root_directory, clear_existing=False):
                     series.instance_count += 1
                     series.save()
                 
+                # === INSTANCE ===
+                sop_instance_uid = get_dicom_tag(ds, 'SOPInstanceUID')
+                if not sop_instance_uid:
+                    print(f"  ✗ Skipping {file_path.name}: No SOPInstanceUID")
+                    stats['errors'] += 1
+                    continue
+                
+                # Get modality
+                modality = get_dicom_tag(ds, 'Modality', '')
+                
+                if sop_instance_uid not in created_instances:
+                    instance, created = DICOMInstance.objects.get_or_create(
+                        sop_instance_uid=sop_instance_uid,
+                        defaults={
+                            'series': series,
+                            'instance_path': str(file_path),
+                            'instance_number': get_dicom_tag(ds, 'InstanceNumber', None),
+                        }
+                    )
+                    created_instances[sop_instance_uid] = instance
+                    if created:
+                        stats['instances'] += 1
+                else:
+                    instance = created_instances[sop_instance_uid]
+                
                 # === RT STRUCT Processing ===
                 if modality == 'RTSTRUCT':
                     try:
@@ -289,12 +284,9 @@ def populate_database(root_directory, clear_existing=False):
                         
                         # Create RTStruct entry
                         rtstruct, created = RTStruct.objects.get_or_create(
-                            rtstruct_instance_uid=series_uid,
+                            instance=instance,
                             defaults={
-                                'series': series,
-                                'sop_instance_uid': sop_instance_uid,
-                                'structure_set_label': get_dicom_tag(ds, 'StructureSetLabel', ''),
-                                'structure_set_description': get_dicom_tag(ds, 'SeriesDescription', ''),
+                                'referenced_series_uid': series_uid,
                             }
                         )
                         if created:
@@ -320,9 +312,10 @@ def populate_database(root_directory, clear_existing=False):
                                 # Create ROI entry
                                 roi, roi_created = Roi.objects.get_or_create(
                                     rtstruct=rtstruct,
-                                    roi_id=str(roi_number),
+                                    roi_label=roi_label,
                                     defaults={
-                                        'roi_label': roi_label,
+                                        'roi_number': roi_number,
+                                        'roi_id': str(roi_number),
                                         'roi_description': roi_description,
                                         'roi_color': roi_color,
                                     }

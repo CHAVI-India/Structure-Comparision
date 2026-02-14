@@ -103,7 +103,7 @@ def build_patient_context(
     feedback_qs = Feedback.objects.filter(
         user=user,
         patient__in=assigned_patients_qs
-    ).select_related('patient', 'roi').order_by('-updated_at')
+    ).select_related('patient', 'roi_rt1', 'roi_rt2').order_by('-updated_at')
     feedback_done_count = feedback_qs.count()
     reviewed_patients_count = feedback_qs.values('patient_id').distinct().count()
     pending_feedback_count = max(assigned_patients_count - reviewed_patients_count, 0)
@@ -112,19 +112,19 @@ def build_patient_context(
     last_feedback = feedback_qs.first()
 
     roi_counts = (
-        Roi.objects.filter(rtstruct__series__dicomseries__study__patient__in=patients_qs)
-        .values('rtstruct__series__dicomseries__study__patient_id')
+        Roi.objects.filter(rtstruct__instance__series__study__patient__in=patients_qs)
+        .values('rtstruct__instance__series__study__patient_id')
         .annotate(total=Count('id', distinct=True))
     )
     roi_count_map = {
-        entry['rtstruct__series__dicomseries__study__patient_id']: entry['total']
+        entry['rtstruct__instance__series__study__patient_id']: entry['total']
         for entry in roi_counts
     }
     feedback_counts = (
-        Feedback.objects.filter(user=user, patient__in=patients_qs, roi__isnull=False)
+        Feedback.objects.filter(user=user, patient__in=patients_qs, roi_rt1__isnull=False)
         .exclude(rt1_rating__isnull=True, rt2_rating__isnull=True)
         .values('patient_id')
-        .annotate(total=Count('roi_id', distinct=True))
+        .annotate(total=Count('common_roi_label', distinct=True))
     )
     feedback_count_map = {entry['patient_id']: entry['total'] for entry in feedback_counts}
 
@@ -360,7 +360,8 @@ def admin_dashboard(request):
         'group__users'
     ).order_by('-assigned_at')
     assignment_groups = AssignmentGroup.objects.filter(created_by=request.user).prefetch_related('users')
-    feedbacks = Feedback.objects.select_related('user', 'patient', 'roi').order_by('-updated_at')
+    feedbacks = Feedback.objects.select_related('user', 'patient', 'roi_rt1', 'roi_rt2').order_by('-updated_at')
+    feedbacks = Feedback.objects.select_related('user', 'patient', 'roi_rt1', 'roi_rt2').order_by('-updated_at')
 
     assigned_user_ids = set(assignments.values_list('user_id', flat=True).distinct())
     group_user_ids = set(
@@ -777,7 +778,7 @@ def dicom_web_viewer(request, patient_uuid=None):
             roi_objects = {}
             if rtstruct_files:
                 # Try to get ROI objects from the first RTSTRUCT
-                rtstruct_instance = RTStruct.objects.filter(series__sop_instance_uid=rtstruct_files[0].get('SOPInstanceUID', '')).first()
+                rtstruct_instance = RTStruct.objects.filter(instance__sop_instance_uid=rtstruct_files[0].get('SOPInstanceUID', '')).first()
                 if rtstruct_instance:
                     roi_objects = {r.roi_label: str(r.id) for r in Roi.objects.filter(rtstruct=rtstruct_instance)}
             
@@ -791,16 +792,16 @@ def dicom_web_viewer(request, patient_uuid=None):
             feedback_filter = {
                 'patient': patient,
                 'user': request.user,
-                'roi__in': [r_id for r_id in roi_data.values() if r_id],
+                'roi_rt1__in': [r_id for r_id in roi_data.values() if r_id],
             }
             if latest_study and latest_study.study_instance_uid:
                 feedback_filter['study_uid'] = latest_study.study_instance_uid
 
-            feedback_objects = Feedback.objects.filter(**feedback_filter).select_related('roi')
+            feedback_objects = Feedback.objects.filter(**feedback_filter).select_related('roi_rt1', 'roi_rt2')
             
             for feedback in feedback_objects:
-                if feedback.roi and feedback.roi.roi_label:
-                    roi_feedback[feedback.roi.roi_label] = {
+                if feedback.roi_rt1 and feedback.roi_rt1.roi_label:
+                    roi_feedback[feedback.roi_rt1.roi_label] = {
                         'rt1_rating': feedback.rt1_rating,
                         'rt2_rating': feedback.rt2_rating,
                         'comment': feedback.comment or ''
@@ -907,12 +908,25 @@ def submit_feedback(request):
                 continue
 
             try:
-                roi = Roi.objects.get(id=roi_id)
+                roi_rt1 = Roi.objects.get(id=roi_id)
             except Roi.DoesNotExist:
                 errors.append(f'Invalid roi_id: {roi_id}')
                 continue
 
-            defaults = {'roi_label': item.get('roi_label', '') or item.get('roi_label', '') or roi.roi_label or ''}
+            roi_label = item.get('roi_label') or roi_rt1.roi_label
+            if not roi_label:
+                errors.append(f'Missing roi_label for roi_id: {roi_id}')
+                continue
+
+            # Find roi_rt2 from rt2_sop_uid
+            try:
+                rtstruct2 = RTStruct.objects.get(instance__sop_instance_uid=rt2_sop_uid)
+                roi_rt2 = Roi.objects.get(rtstruct=rtstruct2, roi_label=roi_label)
+            except (RTStruct.DoesNotExist, Roi.DoesNotExist):
+                errors.append(f'Could not find matching ROI for rt2: {roi_label}')
+                continue
+
+            defaults = {'common_roi_label': roi_label}
             if study_uid:
                 defaults['study_uid'] = study_uid
             if rt1_label:
@@ -930,14 +944,14 @@ def submit_feedback(request):
             if r1 is not None:
                 r1 = int(r1)
                 if r1 < 1 or r1 > 10:
-                    errors.append(f'{roi.roi_label}: RTSTRUCT 1 rating must be 1-10')
+                    errors.append(f'{roi_label}: RTSTRUCT 1 rating must be 1-10')
                     continue
                 defaults['rt1_rating'] = r1
 
             if r2 is not None:
                 r2 = int(r2)
                 if r2 < 1 or r2 > 10:
-                    errors.append(f'{roi.roi_label}: RTSTRUCT 2 rating must be 1-10')
+                    errors.append(f'{roi_label}: RTSTRUCT 2 rating must be 1-10')
                     continue
                 defaults['rt2_rating'] = r2
 
@@ -948,7 +962,8 @@ def submit_feedback(request):
                 lookup = {
                     'user': request.user,
                     'patient': patient,
-                    'roi': roi,
+                    'roi_rt1': roi_rt1,
+                    'roi_rt2': roi_rt2,
                 }
                 if study_uid:
                     lookup['study_uid'] = study_uid

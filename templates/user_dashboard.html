@@ -82,7 +82,7 @@
                                 {% if feedback.roi %}
                                     {{ feedback.roi.roi_label }}
                                 {% else %}
-                                    {{ feedback.roi_label|default:"—" }}
+                                    {{ feedback.common_roi_label|default:"—" }}
                                 {% endif %}
                             </td>
                             <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>

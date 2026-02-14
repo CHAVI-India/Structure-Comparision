@@ -236,3 +236,4 @@ staticfiles/
 Thumbs.db
 tmp/
 *.sqlite3
+migrations/

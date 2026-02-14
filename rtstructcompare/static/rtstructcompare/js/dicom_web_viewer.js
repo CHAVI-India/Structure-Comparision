@@ -549,6 +549,10 @@ function initRatings() {
             const type = input.classList.contains('roi-rating-r1') ? 'r1' : 'r2';
             syncStarSelection(roiName, type, input.value);
             updateRatingDisplayForRoi(roiName, type);
+            // Auto-check the include checkbox
+            const row = document.querySelector(`#roiRatingTable tbody tr[data-roi-name="${roiName}"]`);
+            const cb = row ? row.querySelector('.roi-rating-include') : null;
+            if (cb) cb.checked = true;
         });
     });
 
@@ -629,6 +633,12 @@ function saveComment() {
     }
     updateCommentButtons();
     closeCommentModal();
+    // Auto-check the include checkbox if comment was added
+    if (comment) {
+        const row = document.querySelector(`#roiRatingTable tbody tr[data-roi-name="${activeCommentRoi}"]`);
+        const cb = row ? row.querySelector('.roi-rating-include') : null;
+        if (cb) cb.checked = true;
+    }
 }
 
 async function submitAllRatings() {
