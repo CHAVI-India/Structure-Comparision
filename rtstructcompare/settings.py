@@ -78,8 +78,12 @@ WSGI_APPLICATION = 'rtstructcompare.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'rtstructcompare',
+        'USER': 'admin',
+        'PASSWORD': 'admin',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -122,3 +126,14 @@ LOGIN_URL = '/login/'
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+DICOM_STORAGE_ROOT = Path(os.environ.get('DICOM_STORAGE_ROOT', MEDIA_ROOT / 'dicom_files'))
+
+
+# File upload limits (10 GB)
+TEN_GB = 10 * 1024 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = TEN_GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = TEN_GB

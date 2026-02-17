@@ -15,38 +15,82 @@
     <section class="hero">
         <h1>Admin Control Center</h1>
         <p>Assign patients, track coverage, and review feedback across all users.</p>
+
+        {% with metrics=dashboard_metrics coverage=dashboard_metrics.coverage feedback=dashboard_metrics.feedback activity=dashboard_metrics.activity %}
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="label">Assigned Users</div>
                 <div class="value">{{ assigned_users_count }}</div>
+                <p class="stat-subtext">{{ feedback.active_reviewers|default:"0" }} actively reviewing</p>
             </div>
             <div class="stat-card">
                 <div class="label">Assigned Patients</div>
-                <div class="value">{{ assigned_patients_count }}</div>
+                <div class="value">{{ coverage.assigned_patients|default:assigned_patients_count }}</div>
+                <p class="stat-subtext">{{ coverage.total_patients|default:"0" }} total · {{ coverage.unassigned_patients|default:"0" }} unassigned</p>
             </div>
             <div class="stat-card">
                 <div class="label">Assignments</div>
                 <div class="value">{{ total_assignments }}</div>
+                <p class="stat-subtext">{{ feedback.pending_assignment_pairs|default:"0" }} pending reviews</p>
             </div>
             <div class="stat-card">
-                <div class="label">Feedback (Assigned Users)</div>
-                <div class="value">{{ assigned_feedbacks_count }}</div>
+                <div class="label">Feedback Entries</div>
+                <div class="value">{{ feedback.total_feedback|default:assigned_feedbacks_count }}</div>
+                <p class="stat-subtext">{{ activity.feedback_last_7_days|default:"0" }} updated last 7 days</p>
             </div>
         </div>
+
+        <div class="insight-grid">
+            <article class="insight-card">
+                <header>
+                    <h3>Coverage Snapshot</h3>
+                    <span class="badge">{{ coverage.pending_review_patients|default:"0" }} pending</span>
+                </header>
+                <ul>
+                    <li><strong>{{ coverage.fully_reviewed_patients|default:"0" }}</strong> patients fully reviewed</li>
+                    <li><strong>{{ coverage.pending_review_patients|default:"0" }}</strong> assigned patients awaiting review</li>
+                    <li><strong>{{ coverage.unassigned_patients|default:"0" }}</strong> patients need an assignment</li>
+                </ul>
+            </article>
+            <article class="insight-card">
+                <header>
+                    <h3>Feedback Load</h3>
+                    <span class="badge badge-warn">{{ feedback.pending_assignment_users|default:"0" }} users</span>
+                </header>
+                <ul>
+                    <li><strong>{{ feedback.pending_assignment_pairs|default:"0" }}</strong> user↔patient pairs with no feedback</li>
+                    <li><strong>{{ feedback.active_reviewers|default:"0" }}</strong> active reviewers · {{ feedback.idle_reviewers|default:"0" }} idle</li>
+                    <li><strong>{{ feedback.total_feedback|default:"0" }}</strong> total submissions</li>
+                </ul>
+            </article>
+            <article class="insight-card">
+                <header>
+                    <h3>Activity Pulse</h3>
+                    <span class="badge">7 days</span>
+                </header>
+                <ul>
+                    <li><strong>{{ activity.assignments_last_7_days|default:"0" }}</strong> new assignments</li>
+                    <li><strong>{{ activity.feedback_last_7_days|default:"0" }}</strong> feedback updates</li>
+                    <li>Oldest pending review: <strong>{% if activity.oldest_pending_days %}{{ activity.oldest_pending_days }}d{% else %}—{% endif %}</strong></li>
+                    <li>Avg turnaround: <strong>{% if activity.avg_turnaround_days %}{{ activity.avg_turnaround_days }}d{% else %}—{% endif %}</strong></li>
+                </ul>
+            </article>
+        </div>
+        {% endwith %}
     </section>
 
     <section class="panel">
         <div class="section-header">
             <h2>Assign Patients</h2>
             <div class="assignment-toggle" role="tablist" aria-label="Assignment Mode">
-                <button type="button" id="userBtn" class="btn btn-toggle" role="tab" aria-selected="false">User</button>
-                <button type="button" id="groupBtn" class="btn btn-toggle is-active" role="tab" aria-selected="true">Group</button>
+                <button type="button" id="userBtn" class="btn btn-toggle rounded-full" role="tab" aria-selected="false">User</button>
+                <button type="button" id="groupBtn" class="btn btn-toggle is-active rounded-full" role="tab" aria-selected="true">Group</button>
             </div>
             <a class="btn btn-secondary" href="{% url 'patients' %}">View Patient Page</a>
         </div>
 
         {% if status_message %}
-            <div class="status {{ status_type }}">
+            <div class="status {{ status_type }}" data-status-timeout="{{ status_timeout_ms|default:0 }}">
                 <span>{{ status_message }}</span>
                 <button type="button" class="status-close" aria-label="Dismiss">&times;</button>
             </div>
@@ -128,11 +172,20 @@
                             <div id="bulkPatientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
                                 {% if patients %}
                                     {% for patient in patients %}
-                                        <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.05);">
+                                        <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" data-patient-id="{{ patient.id }}" class="patient-card" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.05);">
                                             <input type="checkbox" name="bulk_patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
                                             <div>
                                                 <div class="group-bulk-name" style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
                                                 <div class="group-bulk-meta" style="font-size:0.82rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                                <span class="assignment-indicator" aria-hidden="true">Already assigned</span>
+                                                <button type="button"
+                                                    class="btn btn-outline btn-xs unassign-patient-btn"
+                                                    data-patient-id="{{ patient.id }}"
+                                                    aria-label="Unassign {{ patient.patient_id }} from selected group"
+                                                    style="padding:4px 8px; color:#9f1239; border-radius:999px;font-size:0.8rem; margin-left:8px;"
+                                                    hidden>
+                                                    Unassign
+                                                </button>
                                             </div>
                                         </label>
                                     {% endfor %}
@@ -219,11 +272,12 @@
                         <div id="patientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
                             {% if patients %}
                                 {% for patient in patients %}
-                                    <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
+                                    <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" data-patient-id="{{ patient.id }}" class="patient-card" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
                                         <input type="checkbox" name="patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
                                         <div>
                                             <div style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
                                             <div style="font-size:0.8rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                            <span class="assignment-indicator" aria-hidden="true">Already assigned</span>
                                         </div>
                                     </label>
                                 {% endfor %}
@@ -234,8 +288,8 @@
                     </div>
                 </div>
                 <div class="form-actions" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;">
-                    <button class="btn btn-primary" type="submit" name="action" value="assign" style="padding:10px 24px;border-radius:16px;font-weight:600;">Assign</button>
-                    <button class="btn btn-danger" type="submit" name="action" value="unassign" style="padding:10px 24px;border-radius:16px;font-weight:600;">Unassign</button>
+                    <button class="btn btn-primary" type="submit" name="action" value="assign" id="assignActionBtn" style="padding:10px 24px;border-radius:16px;font-weight:600;">Assign</button>
+                    <button class="btn btn-danger" type="submit" name="action" value="unassign" id="unassignActionBtn" style="padding:10px 24px;border-radius:16px;font-weight:600;">Unassign</button>
                 </div>
             </form>
         </div>
@@ -263,7 +317,9 @@
                         <th>Patient</th>
                         <th>Assigned Users</th>
                         <th>Groups</th>
+                        <th>Review Status</th>
                         <th>Last Assigned</th>
+                        <th>Pending Age</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -294,8 +350,22 @@
                                 {% endif %}
                             </td>
                             <td>
+                                {% if row.review_state == 'Reviewed' %}
+                                    <span class="pill pill-success">Reviewed</span>
+                                {% else %}
+                                    <span class="pill pill-warn">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
                                 {% if row.last_assigned %}
                                     {{ row.last_assigned|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.first_assigned %}
+                                    {{ row.first_assigned|timesince }} ago
                                 {% else %}
                                     <span class="text-sm text-slate-400">—</span>
                                 {% endif %}
@@ -303,7 +373,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="4">No patients available.</td>
+                            <td colspan="6">No patients available.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -371,6 +441,13 @@
     <input type="hidden" name="group_id" id="delete_group_id">
 </form>
 
+<form id="inlineUnassignForm" method="post" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="unassign">
+    <input type="hidden" name="patient_ids" id="inline_unassign_patient_id">
+    <input type="hidden" name="group_id" id="inline_unassign_group_id">
+</form>
+
 <div class="modal-backdrop" id="groupModal" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
         <div class="modal-header">
@@ -405,140 +482,5 @@
             </div>
         </form>
     </div>
-</div>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const userBtn = document.getElementById('userBtn');
-    const groupBtn = document.getElementById('groupBtn');
-    const userAssignment = document.getElementById('userAssignment');
-    const groupAssignment = document.getElementById('groupAssignment');
-    const groupModal = document.getElementById('groupModal');
-
-    const setAssignmentView = (target) => {
-        if (!userBtn || !groupBtn || !userAssignment || !groupAssignment) {
-            return;
-        }
-        const showGroup = target === 'group';
-        userAssignment.classList.toggle('is-active', !showGroup);
-        groupAssignment.classList.toggle('is-active', showGroup);
-        userAssignment.hidden = showGroup;
-        groupAssignment.hidden = !showGroup;
-
-        userBtn.classList.toggle('is-active', !showGroup);
-        groupBtn.classList.toggle('is-active', showGroup);
-        userBtn.setAttribute('aria-selected', (!showGroup).toString());
-        groupBtn.setAttribute('aria-selected', showGroup.toString());
-    };
-
-    if (userBtn && groupBtn) {
-        userBtn.addEventListener('click', () => setAssignmentView('user'));
-        groupBtn.addEventListener('click', () => setAssignmentView('group'));
-        // Initialize default state to group view on load
-        setAssignmentView('group');
-    }
-
-    const showGroupModal = () => {
-        if (!groupModal) return;
-        groupModal.classList.add('show');
-        groupModal.setAttribute('aria-hidden', 'false');
-    };
-
-    const hideGroupModal = () => {
-        if (!groupModal) return;
-        groupModal.classList.remove('show');
-        groupModal.setAttribute('aria-hidden', 'true');
-    };
-
-    function openModalForCreate() {
-        document.getElementById('groupModalTitle').textContent = 'Create Assignment Group';
-        document.getElementById('modal_action').value = 'create_group';
-        document.getElementById('modal_group_id').value = '';
-        document.getElementById('group_name').value = '';
-        document.getElementById('group_description').value = '';
-        document.getElementById('modal_submit_btn').textContent = 'Create Group';
-        const select = document.getElementById('group_user_ids');
-        for (let option of select.options) {
-            option.selected = false;
-        }
-        showGroupModal();
-    }
-
-    const openGroupModalBtn = document.getElementById('openGroupModal');
-    if (openGroupModalBtn) {
-        openGroupModalBtn.addEventListener('click', openModalForCreate);
-    }
-
-    const openGroupModalGroupBtn = document.getElementById('openGroupModalGroup');
-    if (openGroupModalGroupBtn) {
-        openGroupModalGroupBtn.addEventListener('click', openModalForCreate);
-    }
-
-    const emptyTrigger = document.getElementById('openGroupModalGroupEmpty');
-    if (emptyTrigger) {
-        emptyTrigger.addEventListener('click', openModalForCreate);
-    }
-
-    const closeGroupModalBtn = document.getElementById('closeGroupModal');
-    if (closeGroupModalBtn) {
-        closeGroupModalBtn.addEventListener('click', hideGroupModal);
-    }
-
-    const cancelGroupModalBtn = document.getElementById('cancelGroupModal');
-    if (cancelGroupModalBtn) {
-        cancelGroupModalBtn.addEventListener('click', hideGroupModal);
-    }
-
-    if (groupModal) {
-        groupModal.addEventListener('click', function (event) {
-            if (event.target === groupModal) {
-                hideGroupModal();
-            }
-        });
-    }
-
-    document.querySelectorAll('.edit-group').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const groupId = this.dataset.groupId;
-            const groupName = this.dataset.groupName;
-            const groupDescription = this.dataset.groupDescription;
-            const groupUsers = (this.dataset.groupUsers || '')
-                .split(',')
-                .map(id => id.trim())
-                .filter(id => id.length);
-            document.getElementById('groupModalTitle').textContent = 'Edit Assignment Group';
-            document.getElementById('modal_action').value = 'edit_group';
-            document.getElementById('modal_group_id').value = groupId;
-            document.getElementById('group_name').value = groupName;
-            document.getElementById('group_description').value = groupDescription;
-            document.getElementById('modal_submit_btn').textContent = 'Update Group';
-            // select users
-            const select = document.getElementById('group_user_ids');
-            for (let option of select.options) {
-                option.selected = groupUsers.includes(option.value);
-            }
-            showGroupModal();
-        });
-    });
-
-    const deleteGroupForm = document.getElementById('deleteGroupForm');
-    const deleteGroupIdInput = document.getElementById('delete_group_id');
-    document.querySelectorAll('.delete-group-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const groupName = this.dataset.groupName || 'this group';
-            const groupId = this.dataset.groupId;
-            if (!groupId) {
-                return;
-            }
-            const confirmed = window.confirm(`Delete "${groupName}"? This will remove all assignments for this group.`);
-            if (!confirmed) {
-                return;
-            }
-            if (deleteGroupForm && deleteGroupIdInput) {
-                deleteGroupIdInput.value = groupId;
-                deleteGroupForm.submit();
-            }
-        });
-    });
-});
-</script>
+{{ patient_assignments_map|json_script:"patient-assignments-data" }}
 {% endblock %}

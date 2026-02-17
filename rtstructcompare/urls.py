@@ -14,6 +14,7 @@ from rtstructcompare import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('import/', views.dicom_import, name='dicom_import'),
 
     path('user-dashboard/', views.user_dashboard, name='user_dashboard'),
 

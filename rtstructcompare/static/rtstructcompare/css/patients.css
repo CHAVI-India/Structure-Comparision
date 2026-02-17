@@ -17,9 +17,6 @@
 .patient-page {
     min-height: 100vh;
     padding: 2.5rem 0 4rem;
-    background: radial-gradient(circle at top, rgba(14, 116, 144, 0.12), transparent 55%),
-        radial-gradient(circle at 20% 20%, rgba(15, 118, 110, 0.1), transparent 45%),
-        #f8fafc;
     position: relative;
     overflow: hidden;
     font-family: 'IBM Plex Sans', 'Space Grotesk', sans-serif;

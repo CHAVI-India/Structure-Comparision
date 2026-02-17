@@ -236,4 +236,5 @@ staticfiles/
 Thumbs.db
 tmp/
 *.sqlite3
+media/dicom_files/*
 migrations/

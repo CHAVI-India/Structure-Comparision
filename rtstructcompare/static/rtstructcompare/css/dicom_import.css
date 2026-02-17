@@ -1,0 +1,233 @@
+.import-shell {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.import-card {
+    background: #ffffff;
+    border-radius: 1.25rem;
+    padding: 2rem;
+    box-shadow: 0 25px 60px -35px rgba(15, 23, 42, 0.3);
+    border: 1px solid #e2e8f0;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+}
+
+.stat-pod {
+    border-radius: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.stat-label {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.upload-area {
+    border: 2px dashed #94a3b8;
+    border-radius: 1.25rem;
+    padding: 2rem;
+    text-align: center;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.upload-area:hover {
+    border-color: #0f766e;
+    background: #f0fdfa;
+}
+
+.status-banner {
+    padding: 1rem 1.25rem;
+    border-radius: 0.85rem;
+    font-weight: 600;
+}
+
+.status-success {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #6ee7b7;
+}
+
+.status-error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.status-info {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+
+.import-summary-card {
+    border-radius: 1.25rem;
+    border: 1px solid #e2e8f0;
+    padding: 1.75rem;
+    background: linear-gradient(180deg, rgba(15, 118, 110, 0.08), rgba(15, 118, 110, 0) 70%), #ffffff;
+}
+
+.summary-heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.summary-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    font-size: 1.5rem;
+    background: #ecfdf5;
+}
+
+.summary-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 0.7rem;
+    color: #0f766e;
+    margin-bottom: 0.2rem;
+}
+
+.summary-heading h3 {
+    margin: 0;
+    font-size: 1.35rem;
+    color: #0f172a;
+}
+
+.summary-badge {
+    margin-left: auto;
+    background: #0ea5a4;
+    color: white;
+    padding: 0.35rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.summary-item {
+    border: 1px solid rgba(15, 118, 110, 0.2);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.summary-item span {
+    display: block;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+
+.summary-item strong {
+    font-size: 1.4rem;
+    color: #0f172a;
+}
+
+.summary-item--alert {
+    border-color: rgba(185, 28, 28, 0.4);
+    background: rgba(248, 113, 113, 0.08);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0f766e, #0ea5a4);
+    color: #ffffff;
+    border: none;
+    padding: 0.85rem 1.4rem;
+    border-radius: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+    .import-card {
+        padding: 1.5rem;
+    }
+}
+
+.import-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    padding: 1.5rem;
+}
+
+.import-loading-overlay.is-visible {
+    display: flex;
+}
+
+.import-loading-card {
+    background: #0f172a;
+    color: #f8fafc;
+    border-radius: 1.25rem;
+    padding: 2rem;
+    width: min(420px, 90vw);
+    text-align: center;
+    box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.75);
+}
+
+.import-spinner {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 1rem auto;
+    border: 5px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #2dd4bf;
+    border-radius: 50%;
+    animation: import-spin 0.9s linear infinite;
+}
+
+@keyframes import-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.import-loading-card p {
+    margin: 0.35rem 0;
+    font-size: 0.95rem;
+    color: #e2e8f0;
+}
+
+.import-loading-card p strong {
+    color: #ffffff;
+}

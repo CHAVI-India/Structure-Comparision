@@ -18,6 +18,7 @@
                     {% if request.user.is_staff %}
                         <a href="{% url 'admin_dashboard' %}" class="hover:text-teal-100">Dashboard</a>
                         <a href="{% url 'patients' %}" class="hover:text-teal-100">Patients</a>
+                        <a href="{% url 'dicom_import' %}" class="hover:text-teal-100">Import DICOM</a>
                         <a href="{% url 'admin:index' %}" class="hover:text-teal-100">Admin Panel</a>
                     {% else %}
                         <a href="{% url 'user_dashboard' %}" class="hover:text-teal-100">Dashboard</a>
