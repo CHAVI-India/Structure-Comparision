@@ -1,0 +1,486 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Admin Dashboard - Structure Comparison{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'rtstructcompare/js/admin_dashboard.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/admin_dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="admin-shell">
+    <section class="hero">
+        <h1>Admin Control Center</h1>
+        <p>Assign patients, track coverage, and review feedback across all users.</p>
+
+        {% with metrics=dashboard_metrics coverage=dashboard_metrics.coverage feedback=dashboard_metrics.feedback activity=dashboard_metrics.activity %}
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Assigned Users</div>
+                <div class="value">{{ assigned_users_count }}</div>
+                <p class="stat-subtext">{{ feedback.active_reviewers|default:"0" }} actively reviewing</p>
+            </div>
+            <div class="stat-card">
+                <div class="label">Assigned Patients</div>
+                <div class="value">{{ coverage.assigned_patients|default:assigned_patients_count }}</div>
+                <p class="stat-subtext">{{ coverage.total_patients|default:"0" }} total · {{ coverage.unassigned_patients|default:"0" }} unassigned</p>
+            </div>
+            <div class="stat-card">
+                <div class="label">Assignments</div>
+                <div class="value">{{ total_assignments }}</div>
+                <p class="stat-subtext">{{ feedback.pending_assignment_pairs|default:"0" }} pending reviews</p>
+            </div>
+            <div class="stat-card">
+                <div class="label">Feedback Entries</div>
+                <div class="value">{{ feedback.total_feedback|default:assigned_feedbacks_count }}</div>
+                <p class="stat-subtext">{{ activity.feedback_last_7_days|default:"0" }} updated last 7 days</p>
+            </div>
+        </div>
+
+        <div class="insight-grid">
+            <article class="insight-card">
+                <header>
+                    <h3>Coverage Snapshot</h3>
+                    <span class="badge">{{ coverage.pending_review_patients|default:"0" }} pending</span>
+                </header>
+                <ul>
+                    <li><strong>{{ coverage.fully_reviewed_patients|default:"0" }}</strong> patients fully reviewed</li>
+                    <li><strong>{{ coverage.pending_review_patients|default:"0" }}</strong> assigned patients awaiting review</li>
+                    <li><strong>{{ coverage.unassigned_patients|default:"0" }}</strong> patients need an assignment</li>
+                </ul>
+            </article>
+            <article class="insight-card">
+                <header>
+                    <h3>Feedback Load</h3>
+                    <span class="badge badge-warn">{{ feedback.pending_assignment_users|default:"0" }} users</span>
+                </header>
+                <ul>
+                    <li><strong>{{ feedback.pending_assignment_pairs|default:"0" }}</strong> user↔patient pairs with no feedback</li>
+                    <li><strong>{{ feedback.active_reviewers|default:"0" }}</strong> active reviewers · {{ feedback.idle_reviewers|default:"0" }} idle</li>
+                    <li><strong>{{ feedback.total_feedback|default:"0" }}</strong> total submissions</li>
+                </ul>
+            </article>
+            <article class="insight-card">
+                <header>
+                    <h3>Activity Pulse</h3>
+                    <span class="badge">7 days</span>
+                </header>
+                <ul>
+                    <li><strong>{{ activity.assignments_last_7_days|default:"0" }}</strong> new assignments</li>
+                    <li><strong>{{ activity.feedback_last_7_days|default:"0" }}</strong> feedback updates</li>
+                    <li>Oldest pending review: <strong>{% if activity.oldest_pending_days %}{{ activity.oldest_pending_days }}d{% else %}—{% endif %}</strong></li>
+                    <li>Avg turnaround: <strong>{% if activity.avg_turnaround_days %}{{ activity.avg_turnaround_days }}d{% else %}—{% endif %}</strong></li>
+                </ul>
+            </article>
+        </div>
+        {% endwith %}
+    </section>
+
+    <section class="panel">
+        <div class="section-header">
+            <h2>Assign Patients</h2>
+            <div class="assignment-toggle" role="tablist" aria-label="Assignment Mode">
+                <button type="button" id="userBtn" class="btn btn-toggle rounded-full" role="tab" aria-selected="false">User</button>
+                <button type="button" id="groupBtn" class="btn btn-toggle is-active rounded-full" role="tab" aria-selected="true">Group</button>
+            </div>
+            <a class="btn btn-secondary" href="{% url 'patients' %}">View Patient Page</a>
+        </div>
+
+        {% if status_message %}
+            <div class="status {{ status_type }}" data-status-timeout="{{ status_timeout_ms|default:0 }}">
+                <span>{{ status_message }}</span>
+                <button type="button" class="status-close" aria-label="Dismiss">&times;</button>
+            </div>
+        {% endif %}
+
+        <div id="groupAssignment" class="assignment-view is-active" aria-labelledby="groupBtn">
+            <div class="group-assignment-shell">
+                <div class="group-assignment-header flex items-center justify-between mb-4">
+                    <div>
+                        <h3 style="margin:0;font-size:1.4rem;color:#0f172a;">Bulk group assignment</h3>
+                        <p style="margin:6px 0 0;color:#475569;font-size:0.95rem;">Select one or more groups on the left, then pair them with patients on the right.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary group-modal-trigger" id="openGroupModal" style="border-radius:999px;padding:10px 18px;font-weight:600;">+ Create Group</button>
+                </div>
+
+                <form method="post" class="group-bulk-form" style="display:flex;flex-direction:column;gap:20px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assign_groups">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;align-items:start;">
+                        <section aria-label="Select groups" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:100%;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Groups</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose the groups to receive patients.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ assignment_groups|length }} total</span>
+                            </div>
+                            <input type="text" id="bulk_group_search" class="bulk-filter" placeholder="Filter groups by name or description" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;width:100%;">
+                            <div id="bulkGroupList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+                                {% if assignment_groups %}
+                                    {% for group in assignment_groups %}
+                                        <label class="group-bulk-item" data-label="{{ group.name|lower }} {{ group.description|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.06);">
+                                            <input type="checkbox" name="bulk_group_ids" value="{{ group.id }}" style="width:16px;height:16px;">
+                                            <div>
+                                                <div class="group-bulk-name" style="font-weight:600;color:#0f172a;">{{ group.name }}</div>
+                                                <div class="group-bulk-meta" style="font-size:0.82rem;color:#64748b;">
+                                                    {{ group.users.count }} user{{ group.users.count|pluralize }} · {{ group.grouppatientassignment_set.count }} patient{{ group.grouppatientassignment_set.count|pluralize }}
+                                                </div>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button type="button"
+                                                    class="btn btn-outline btn-xs delete-group-btn"
+                                                    data-group-id="{{ group.id }}"
+                                                    data-group-name="{{ group.name }}"
+                                                    style="padding:6px 10px; color:#9f1239; border-radius:999px;font-size:0.8rem;">
+                                                    Delete
+                                                </button>
+                                                <button type="button"
+                                                    class="btn btn-outline btn-xs edit-group"
+                                                    data-group-id="{{ group.id }}"
+                                                    data-group-name="{{ group.name }}"
+                                                    data-group-description="{{ group.description }}"
+                                                    data-group-users="{% for user in group.users.all %}{{ user.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                                                    style="padding:6px 10px; color:#0f766e; border-radius:999px;font-size:0.8rem;">
+                                                    Edit
+                                                </button>
+                                            </div>
+                                        </label>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="empty-panel">
+                                        <p class="empty-panel__title">No groups yet</p>
+                                        <p class="empty-panel__subtitle">Create a group to begin assignments.</p>
+                                        <button type="button" class="btn btn-primary group-modal-trigger" id="openGroupModalGroupEmpty">Start a Group</button>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </section>
+
+                        <section aria-label="Select patients" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:100%;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Patients</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose one or more patients to assign.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ patients|length }} total</span>
+                            </div>
+                            <input type="text" id="bulk_patient_search" class="bulk-filter" placeholder="Filter patients by ID or name" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;width:100%;">
+                            <div id="bulkPatientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+                                {% if patients %}
+                                    {% for patient in patients %}
+                                        <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" data-patient-id="{{ patient.id }}" class="patient-card" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.05);">
+                                            <input type="checkbox" name="bulk_patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
+                                            <div>
+                                                <div class="group-bulk-name" style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
+                                                <div class="group-bulk-meta" style="font-size:0.82rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                                <span class="assignment-indicator" aria-hidden="true">Already assigned</span>
+                                                <button type="button"
+                                                    class="btn btn-outline btn-xs unassign-patient-btn"
+                                                    data-patient-id="{{ patient.id }}"
+                                                    aria-label="Unassign {{ patient.patient_id }} from selected group"
+                                                    style="padding:4px 8px; color:#9f1239; border-radius:999px;font-size:0.8rem; margin-left:8px;"
+                                                    hidden>
+                                                    Unassign
+                                                </button>
+                                            </div>
+                                        </label>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="empty-panel">
+                                        <p class="empty-panel__title">No patients available</p>
+                                        <p class="empty-panel__subtitle">Upload DICOM studies to start.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </section>
+                    </div>
+                    <div class="form-actions" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                        <div class="helper-text" style="color:#475569;font-size:0.9rem;">Each selected patient is linked to every selected group.</div>
+                        <button class="btn btn-primary" type="submit" style="padding:12px 22px;border-radius:16px;font-weight:600;">Assign Patients to Selected Groups</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="userAssignment" class="assignment-view" aria-labelledby="userBtn">
+            <form method="post" class="panel-form">
+                <div class="mb-4">
+                        <h3 style="margin:0;font-size:1.4rem;color:#0f172a;">Bulk User assignment</h3>
+                        <p style="margin:6px 0 0;color:#475569;font-size:0.95rem;">Select one or more users on the left, then pair them with patients on the right.</p>
+                    </div>
+                {% csrf_token %}
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;">
+                    <div class="form-control" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Users</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose the users to receive patients.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ assignment_groups|length }} total</span>
+                            </div>
+                            <div class="group-toolbar" id="groupToolbar" style="position:relative;">
+                                <div class="group-dropdown" id="groupDropdown" style="position:absolute;right:0;top:110%;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:12px;box-shadow:0 18px 35px rgba(15,23,42,0.15);width:280px;display:none;flex-direction:column;gap:8px;z-index:10;">
+                                    {% if assignment_groups %}
+                                        {% for group in assignment_groups %}
+                                            <button type="button" class="group-option" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" style="text-align:left;border:1px solid #e2e8f0;border-radius:12px;padding:8px 10px;background:#f8fafc;">
+                                                <div class="group-option-name" style="font-weight:600;color:#0f172a;">{{ group.name }}</div>
+                                                <div class="group-option-meta" style="font-size:0.8rem;color:#64748b;">
+                                                    {{ group.users.all|length }} users
+                                                    {% if group.description %} · {{ group.description|truncatechars:40 }}{% endif %}
+                                                </div>
+                                            </button>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="group-empty" style="text-align:center;color:#94a3b8;">No groups yet. Create one to assign faster.</div>
+                                    {% endif %}
+                                    <button type="button" class="group-clear" id="clearGroupSelection" style="border:none;background:none;color:#ef4444;font-weight:600;">Clear group selection</button>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" name="group_id" id="group_id">
+                        <input type="text" id="user_search" name="user_search" placeholder="Search users by username or email" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;">
+                        <div id="userList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+                            {% if users %}
+                                {% for user in users %}
+                                    <label data-label="{{ user.username|lower }} {{ user.email|default:''|lower }}" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
+                                        <input type="checkbox" name="user_ids" value="{{ user.id }}" style="width:16px;height:16px;">
+                                        <div>
+                                            <div style="font-weight:600;color:#0f172a;">{{ user.username }}</div>
+                                            <div style="font-size:0.8rem;color:#94a3b8;">{{ user.email|default:'no email on file' }}</div>
+                                        </div>
+                                    </label>
+                                {% endfor %}
+                            {% else %}
+                                <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No users available.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="form-control" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                                <div>
+                                    <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Patients</h4>
+                                    <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose one or more patients to assign.</p>
+                                </div>
+                                <span class="badge" style="background:#badbfa;color:#125b9f;;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ assignment_groups|length }} total</span>
+                            </div>
+                        <input type="text" id="patient_search" name="patient_search" placeholder="Search patients by ID or name" style="border:1px solid #cbd5f5;color:#0f172a;border-radius:14px;padding:10px 14px;font-size:0.9rem;background:#ffffff;">
+                        <div id="patientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+                            {% if patients %}
+                                {% for patient in patients %}
+                                    <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" data-patient-id="{{ patient.id }}" class="patient-card" style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
+                                        <input type="checkbox" name="patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
+                                        <div>
+                                            <div style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
+                                            <div style="font-size:0.8rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                            <span class="assignment-indicator" aria-hidden="true">Already assigned</span>
+                                        </div>
+                                    </label>
+                                {% endfor %}
+                            {% else %}
+                                <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No patients available.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" type="submit" name="action" value="assign" id="assignActionBtn" style="padding:10px 24px;border-radius:16px;font-weight:600;">Assign</button>
+                    <button class="btn btn-danger" type="submit" name="action" value="unassign" id="unassignActionBtn" style="padding:10px 24px;border-radius:16px;font-weight:600;">Unassign</button>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="section-header">
+            <h2>Assignment Overview</h2>
+            {% if assignment_page_obj %}
+                <div class="pagination-controls">
+                    {% if assignment_page_obj.has_previous %}
+                        <a class="page-link" href="{{ assignment_page_prefix }}assignment_page={{ assignment_page_obj.previous_page_number }}">Prev</a>
+                    {% endif %}
+                    <span class="page-status">Page {{ assignment_page_obj.number }} of {{ assignment_page_obj.paginator.num_pages }}</span>
+                    {% if assignment_page_obj.has_next %}
+                        <a class="page-link" href="{{ assignment_page_prefix }}assignment_page={{ assignment_page_obj.next_page_number }}">Next</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>Assigned Users</th>
+                        <th>Groups</th>
+                        <th>Review Status</th>
+                        <th>Last Assigned</th>
+                        <th>Pending Age</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in assignment_rows %}
+                        <tr>
+                            <td>
+                                <strong>{{ row.patient.patient_id }}</strong>
+                                {% if row.patient.patient_name %}
+                                    <div class="text-sm text-slate-500">{{ row.patient.patient_name }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.usernames %}
+                                    {% for username in row.usernames %}
+                                        <span class="pill">{{ username }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">Unassigned</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.groups %}
+                                    {% for group in row.groups %}
+                                        <span class="pill pill-group">{{ group }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.review_state == 'Reviewed' %}
+                                    <span class="pill pill-success">Reviewed</span>
+                                {% else %}
+                                    <span class="pill pill-warn">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.last_assigned %}
+                                    {{ row.last_assigned|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.first_assigned %}
+                                    {{ row.first_assigned|timesince }} ago
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6">No patients available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="section-header">
+            <h2>Recent Feedback</h2>
+            {% if feedback_page_obj %}
+                <div class="pagination-controls">
+                    {% if feedback_page_obj.has_previous %}
+                        <a class="page-link" href="{{ feedback_page_prefix }}feedback_page={{ feedback_page_obj.previous_page_number }}">Prev</a>
+                    {% endif %}
+                    <span class="page-status">Page {{ feedback_page_obj.number }} of {{ feedback_page_obj.paginator.num_pages }}</span>
+                    {% if feedback_page_obj.has_next %}
+                        <a class="page-link" href="{{ feedback_page_prefix }}feedback_page={{ feedback_page_obj.next_page_number }}">Next</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Patient</th>
+                        <th>ROI</th>
+                        <th>RT1 Label</th>
+                        <th>RT1 Rating</th>
+                        <th>RT2 Label</th>
+                        <th>RT2 Rating</th>
+                        <th>Comment</th>
+                        <th>Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for feedback in feedbacks %}
+                        <tr>
+                            <td>{{ feedback.user.username }}</td>
+                            <td>{{ feedback.patient.patient_id }}</td>
+                            <td>{% if feedback.roi %}{{ feedback.roi.roi_label }}{% else %}{{ feedback.common_roi_label|default:"—" }}{% endif %}</td>
+                            <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
+                            <td>{{ feedback.rt1_rating|default:"—" }}</td>
+                            <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
+                            <td>{{ feedback.rt2_rating|default:"—" }}</td>
+                            <td>{{ feedback.comment|default:"—" }}</td>
+                            <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9">No feedback submitted yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<form id="deleteGroupForm" method="post" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="delete_group">
+    <input type="hidden" name="group_id" id="delete_group_id">
+</form>
+
+<form id="inlineUnassignForm" method="post" style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="unassign">
+    <input type="hidden" name="patient_ids" id="inline_unassign_patient_id">
+    <input type="hidden" name="group_id" id="inline_unassign_group_id">
+</form>
+
+<div class="modal-backdrop" id="groupModal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div class="modal-header">
+            <h3 class="modal-title" id="groupModalTitle">Create Assignment Group</h3>
+            <button type="button" class="modal-close" id="closeGroupModal">&times;</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="modal_action" value="create_group">
+            <input type="hidden" name="group_id" id="modal_group_id">
+            <div class="form-control">
+                <label for="group_name">Group Name</label>
+                <input type="text" id="group_name" name="group_name" placeholder="e.g. Breast QA Team" required>
+            </div>
+            <div class="form-control">
+                <label for="group_description">Description</label>
+                <textarea id="group_description" name="group_description" rows="3" placeholder="Optional: purpose, modality focus, or region"></textarea>
+            </div>
+            <div class="form-control">
+                <label for="group_user_ids">Add Users</label>
+                <input type="text" id="group_user_search" name="group_user_search" placeholder="Search users to include">
+                <div class="helper-text">Pick the users who should receive group assignments.</div>
+                <select id="group_user_ids" name="group_user_ids" multiple size="7" required>
+                    {% for user in users %}
+                        <option value="{{ user.id }}">{{ user.username }}{% if user.email %} · {{ user.email }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="cancelGroupModal">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="modal_submit_btn">Create Group</button>
+            </div>
+        </form>
+    </div>
+{{ patient_assignments_map|json_script:"patient-assignments-data" }}
+{% endblock %}

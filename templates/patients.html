@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block title %}Patients - DICOM Structure Comparison{% endblock %}
+
+{% block extra_css %}
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/patients.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'rtstructcompare/js/patients.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="patient-page">
+    <div class="patient-list-container">
+        <div class="page-header">
+            <div class="page-header-top">
+                <div>
+                    <div class="page-eyebrow">Assignments</div>
+                    <h1 class="page-title">DICOM Patients</h1>
+                    <p class="page-subtitle">Select a patient to compare their structure studies.</p>
+                </div>
+                <div class="header-stats" id="header_stats">
+                    <div class="stat-pill"><strong>{{ total_patients }}</strong> patients</div>
+                    <div class="stat-pill"><strong>{{ total_studies }}</strong> studies</div>
+                    <div class="stat-pill"><strong>{{ total_series }}</strong> series</div>
+                </div>
+            </div>
+
+            <form method="get" class="filter-bar">
+                <div class="flex items-center justify-between gap-4">
+                    <div class="filter-field">
+                        <span class="filter-label">Filter by group</span>
+                        <select id="group_filter" name="group" class="filter-select">
+                            <option value="" {% if not group_filter %}selected{% endif %}>All Patients</option>
+                            {% for group in assignment_groups %}
+                                <option value="{{ group.id }}" {% if group_filter == group.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ group.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-label" for="feedback_status_filter">Feedback status</label>
+                        <select id="feedback_status_filter" name="feedback_status" class="filter-select">
+                            <option value="" {% if not feedback_status %}selected{% endif %}>All Status</option>
+                            <option value="pending" {% if feedback_status == 'pending' %}selected{% endif %}>Pending feedback</option>
+                            <option value="done" {% if feedback_status == 'done' %}selected{% endif %}>Done</option>
+                            <option value="not_started" {% if feedback_status == 'not_started' %}selected{% endif %}>Not started</option>
+                        </select>
+                    </div>
+                    <div class="filter-field filter-search">
+                        <label class="filter-label" for="patient_search">Search</label>
+                        <div class="filter-search-input">
+                            <input
+                                id="patient_search"
+                                name="search"
+                                type="search"
+                                class="filter-input"
+                                placeholder="Search by ID or name"
+                                value="{{ search_query }}"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div id="patients-results">
+            {% if patients %}
+            {% for patient_data in patients %}
+            <div class="patient-card">
+                <div class="patient-info">
+                    <div class="patient-id">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        Patient: {{ patient_data.patient.patient_id }}
+                    </div>
+
+                    <div class="patient-details">
+                        {% if patient_data.patient.patient_name %}
+                        <div class="detail-item">
+                            <span class="detail-label">Name:</span>
+                            <span class="detail-value">{{ patient_data.patient.patient_name }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if patient_data.patient.patient_gender %}
+                        <div class="detail-item">
+                            <span class="detail-label">Gender:</span>
+                            <span class="detail-value">{{ patient_data.patient.patient_gender }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if patient_data.patient.patient_date_of_birth %}
+                        <div class="detail-item">
+                            <span class="detail-label">DOB:</span>
+                            <span class="detail-value">{{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if not patient_data.patient.patient_name and not patient_data.patient.patient_gender and not patient_data.patient.patient_date_of_birth %}
+                        <div class="detail-empty">No demographic details available.</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="patient-actions">
+                    <div class="patient-stats">
+                        {% if patient_data.feedback_roi_count > 0 %}
+                        <div class="stat-chip">
+                            <strong>{{ patient_data.feedback_roi_count }}</strong>
+                            Feedback ROIs
+                        </div>
+                        <div class="stat-chip">
+                            <strong>{{ patient_data.pending_roi_count }}</strong>
+                            Pending ROIs
+                        </div>
+                        {% else %}
+                        <div class="stat-chip">
+                            <strong>{{ patient_data.total_studies }}</strong>
+                            Studies
+                        </div>
+                        <div class="stat-chip">
+                            <strong>{{ patient_data.total_series }}</strong>
+                            Series
+                        </div>
+                        {% endif %}
+                    </div>
+                    <a href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}" class="btn-compare {% if patient_data.feedback_status == 'done' %}btn-done{% elif patient_data.feedback_status == 'pending' %}btn-review{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
+                            </path>
+                        </svg>
+                        {% if patient_data.feedback_status == 'done' %}
+                        Done
+                        {% elif patient_data.feedback_status == 'pending' %}
+                        Review Studies
+                        {% else %}
+                        Compare Studies
+                        {% endif %}
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+            {% if is_paginated %}
+            <div class="pagination">
+                <span class="page-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                <div class="page-links">
+                    {% if page_obj.has_previous %}
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if pagination_querystring %}&{{ pagination_querystring }}{% endif %}">Previous</a>
+                    {% else %}
+                        <span class="page-link disabled">Previous</span>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <span class="page-link active">{{ num }}</span>
+                        {% else %}
+                            <a class="page-link" href="?page={{ num }}{% if pagination_querystring %}&{{ pagination_querystring }}{% endif %}">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if pagination_querystring %}&{{ pagination_querystring }}{% endif %}">Next</a>
+                    {% else %}
+                        <span class="page-link disabled">Next</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="empty-state">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                    </path>
+                </svg>
+                <h3 style="font-size: 1.5rem; font-weight: 600; color: #111827; margin-bottom: 0.5rem;">No Patients Found</h3>
+                <p style="color: #6b7280;">No patient data has been imported yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

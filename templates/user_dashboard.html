@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+
+{% block title %}My Patients - Structure Comparison{% endblock %}
+
+{% block extra_css %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'rtstructcompare/css/user_dashboard.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-shell">
+    <section class="hero">
+        <h1>My Assigned Patients</h1>
+        <p>Review and compare the RT structures for the patients assigned to your account.</p>
+        <div class="stats">
+            <div class="stat">
+                <div class="label">Assigned Patients</div>
+                <div class="value">{{ assigned_patients_count }}</div>
+                <div class="meta">Active review workload</div>
+            </div>
+            <div class="stat">
+                <div class="label">Feedback Entries</div>
+                <div class="value">{{ feedback_done_count }}</div>
+                <div class="meta">ROI-level submissions</div>
+            </div>
+            <div class="stat">
+                <div class="label">Pending Reviews</div>
+                <div class="value">{{ pending_feedback_count }}</div>
+                <div class="meta">Patients awaiting feedback</div>
+            </div>
+            <div class="stat">
+                <div class="label">Completion Rate</div>
+                <div class="value">{{ completion_rate }}%</div>
+                <div class="meta">{{ reviewed_patients_count }} of {{ assigned_patients_count }} patients</div>
+            </div>
+            <div class="stat">
+                <div class="label">Latest Feedback</div>
+                {% if last_feedback %}
+                    <div class="value">{{ last_feedback.updated_at|date:"M d" }}</div>
+                    <div class="meta">
+                        {{ last_feedback.patient.patient_id }}
+                        {% if last_feedback.roi %} · {{ last_feedback.roi.roi_label }}{% endif %}
+                    </div>
+                {% else %}
+                    <div class="value">—</div>
+                    <div class="meta">No feedback yet</div>
+                {% endif %}
+            </div>
+        </div>
+        <form class="search-bar" method="get">
+            <input type="text" name="search" placeholder="Search by patient ID or name" value="{{ search_query }}">
+            <button type="submit">Search</button>
+        </form>
+    </section>
+
+    <section class="panel">
+        <div class="section-header">
+            <div>
+                <h2>My Feedbacks</h2>
+                <p class="text-sm">Recent ROI feedback submissions for your assigned patients.</p>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="feedback-table">
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>ROI</th>
+                        <th>RT1 Label</th>
+                        <th>RT1 Rating</th>
+                        <th>RT2 Label</th>
+                        <th>RT2 Rating</th>
+                        <th>Comment</th>
+                        <th>Updated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for feedback in recent_feedbacks %}
+                        <tr>
+                            <td>{{ feedback.patient.patient_id }}</td>
+                            <td>
+                                {% if feedback.roi %}
+                                    {{ feedback.roi.roi_label }}
+                                {% else %}
+                                    {{ feedback.common_roi_label|default:"—" }}
+                                {% endif %}
+                            </td>
+                            <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
+                            <td>{{ feedback.rt1_rating|default:"—" }}</td>
+                            <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
+                            <td>{{ feedback.rt2_rating|default:"—" }}</td>
+                            <td>{{ feedback.comment|default:"—"|truncatechars:60 }}</td>
+                            <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-slate-500">No feedback submitted yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    {% if patients %}
+        <section class="patient-grid">
+            {% for patient_data in patients %}
+                <article class="patient-card">
+                    <div>
+                        <div class="patient-id truncate">{{ patient_data.patient.patient_id }}</div>
+                        <div class="patient-meta">
+                            {% if patient_data.patient.patient_name %}
+                                <div><span>Name:</span> {{ patient_data.patient.patient_name }}</div>
+                            {% endif %}
+                            {% if patient_data.patient.patient_gender %}
+                                <div><span>Gender:</span> {{ patient_data.patient.patient_gender }}</div>
+                            {% endif %}
+                            {% if patient_data.patient.patient_date_of_birth %}
+                                <div><span>DOB:</span> {{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="counts">
+                        <span class="count-pill">Studies: {{ patient_data.total_studies }}</span>
+                        <span class="count-pill">Series: {{ patient_data.total_series }}</span>
+                    </div>
+                    <div class="cta">
+                        <a href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}">
+                            View Comparison
+                        </a>
+                    </div>
+                </article>
+            {% endfor %}
+        </section>
+    {% else %}
+        <div class="empty-state">
+            <h3 class="text-xl font-semibold text-slate-800">No assigned patients yet</h3>
+            <p>Ask an admin to assign patients to your account.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

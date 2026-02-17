@@ -3,9 +3,9 @@ from django.contrib.auth.models import User
 # Create your models here.
 
 class UserTypeChoices(models.TextChoices):
-    'Rater' = 'RATER', 'Rater'
-    'Viewer' = 'VIEWER', 'Viewer'
-    'Provider' = 'PROVIDER', 'Provider'
+    RATER = 'RATER', 'Rater'
+    VIEWER = 'VIEWER', 'Viewer'
+    PROVIDER = 'PROVIDER', 'Provider'
 
 
 class UserProfile(models.Model):

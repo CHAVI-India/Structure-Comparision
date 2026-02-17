@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Import DICOM - Structure Comparison{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'rtstructcompare/css/dicom_import.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'rtstructcompare/js/dicom_import.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="import-shell">
+    <div class="import-card">
+        <div class="flex flex-col gap-2 mb-6">
+            <p class="text-sm uppercase tracking-[0.3em] text-slate-400 font-semibold">DICOM ingestion</p>
+            <h1 class="text-3xl font-bold text-slate-900">Upload patient datasets</h1>
+            <p class="text-slate-500">Upload a ZIP that contains CT, RTSTRUCT, and related files. We'll scan every folder inside and add any supported studies automatically.</p>
+        </div>
+
+        {% if status_message %}
+            <div class="status-banner status-{{ status_type }}" data-status-timeout="{{ status_timeout_ms|default:0 }}">
+                {{ status_message }}
+            </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="space-y-6 mt-6" id="dicomImportForm">
+            {% csrf_token %}
+            <div class="upload-area">
+                <input type="file" name="dicom_archive" id="dicom_archive" accept=".zip" required class="sr-only">
+                <label for="dicom_archive" class="flex flex-col gap-2 cursor-pointer">
+                    <span class="text-lg font-semibold text-slate-800">Drop your ZIP here or click to browse</span>
+                    <span class="text-sm text-slate-500">Accepted format: .zip · The archive can contain nested folders.</span>
+                </label>
+                <div id="selected_file_name" class="text-sm text-slate-400 mt-3 font-medium">No file selected yet.</div>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <span class="text-xs text-slate-500">*Uploading may take a few minutes—stay on this page until it completes.</span>
+                <button type="submit" class="btn-primary" id="dicomImportSubmit">Start Import</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="import-card">
+        <h2 class="text-xl font-bold text-slate-900 mb-4">Current library overview</h2>
+        <div class="stat-grid">
+            <div class="stat-pod">
+                <div class="stat-label">Patients</div>
+                <div class="stat-value">{{ patient_count }}</div>
+            </div>
+            <div class="stat-pod">
+                <div class="stat-label">Studies</div>
+                <div class="stat-value">{{ study_count }}</div>
+            </div>
+            <div class="stat-pod">
+                <div class="stat-label">Series</div>
+                <div class="stat-value">{{ series_count }}</div>
+            </div>
+            <div class="stat-pod">
+                <div class="stat-label">Instances</div>
+                <div class="stat-value">{{ instance_count }}</div>
+            </div>
+            <div class="stat-pod">
+                <div class="stat-label">RT Structs</div>
+                <div class="stat-value">{{ rtstruct_count }}</div>
+            </div>
+            <div class="stat-pod">
+                <div class="stat-label">ROIs</div>
+                <div class="stat-value">{{ roi_count }}</div>
+            </div>
+        </div>
+
+        {% if import_stats %}
+            <div class="mt-8 import-summary-card">
+                <div class="summary-heading">
+                    <div class="summary-icon" aria-hidden="true">✅</div>
+                    <div>
+                        <p class="summary-eyebrow">Latest import summary</p>
+                        <h3>What just changed</h3>
+                    </div>
+                    <span class="summary-badge">{{ import_stats.total|default:"Just finished" }}</span>
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span>Patients created</span>
+                        <strong>{{ import_stats.patients }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Studies created</span>
+                        <strong>{{ import_stats.studies }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Series created</span>
+                        <strong>{{ import_stats.series }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Instances created</span>
+                        <strong>{{ import_stats.instances }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>RT Structs created</span>
+                        <strong>{{ import_stats.rtstructs }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>ROIs created</span>
+                        <strong>{{ import_stats.rois }}</strong>
+                    </div>
+                    <div class="summary-item summary-item--alert">
+                        <span>Errors</span>
+                        <strong>{{ import_stats.errors }}</strong>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="import-loading-overlay" id="importLoadingOverlay" aria-hidden="true">
+    <div class="import-loading-card" role="alert" aria-live="assertive">
+        <div class="import-spinner" aria-hidden="true"></div>
+        <p><strong>Import in progress</strong></p>
+        <p>Please wait while we process the uploaded ZIP. This can take a few minutes.</p>
+    </div>
+</div>
+{% endblock %}

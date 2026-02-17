@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DICOM CT & RTSTRUCT Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block extra_css %}
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/dicom_web_viewer.css' %}">
+    {% endblock %}
+</head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">DICOM CT & RTSTRUCT Viewer</h1>
+            <button class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"><a href="{% url 'patients' %}"><- Back To Patient Page</a></button>
+        </div>
+
+        <!-- Patient Info -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <h2 class="text-xl font-semibold mb-3">Patient Information</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <span class="font-medium">Patient ID:</span>
+                    <span id="patientId" class="ml-2 text-sm">{{ patient_id }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">Study Date:</span>
+                    <span id="studyDate" class="ml-2">{{ study_date }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">Study Description:</span>
+                    <span id="studyDescription" class="ml-2">{{ study_description }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">CT Slices:</span>
+                    <span id="ctCount" class="ml-2">{{ ct_count }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">RTSTRUCT Files:</span>
+                    <span id="rtstructCount" class="ml-2">{{ rtstruct_count }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">RT1 ROI Count:</span>
+                    <span class="ml-2">{{ rt1_roi_count }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">RT2 ROI Count:</span>
+                    <span class="ml-2">{{ rt2_roi_count }}</span>
+                </div>
+                <div>
+                    <span class="font-medium">Common ROI Count:</span>
+                    <span class="ml-2">{{ common_roi_count }}</span>
+                </div>
+            </div>
+            {% if error %}
+            <div class="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                <strong>Error:</strong> {{ error }}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Main Viewer -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div id="comparisonBanner" class="mb-4 p-4 rounded-lg border-2 border-indigo-300 bg-indigo-50 relative">
+                <button type="button" onclick="dismissComparisonBanner()" aria-label="Dismiss comparison banner"
+                    class="absolute top-2 right-2 text-indigo-700 hover:text-indigo-900 text-lg leading-none">
+                    ×
+                </button>
+                <div class="text-lg font-semibold text-indigo-800">Comparison Mode</div>
+                <div class="text-sm text-indigo-700">This viewer is built to compare two RTSTRUCTs side-by-side. Please submit your overall preference below.</div>
+            </div>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">CT Comparison Viewer</h2>
+                <div class="flex gap-2">
+                    <button onclick="previousSlice()"
+                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                        ← Previous
+                    </button>
+                    <span class="px-4 py-2 bg-gray-200 rounded">
+                        Slice: <span id="currentSlice">1</span> / <span id="totalSlices">1</span>
+                    </span>
+                    <button onclick="nextSlice()"
+                        class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition">
+                        Next →
+                    </button>
+                </div>
+            </div>
+
+            <!-- Window/Level Controls -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-4 mb-3">
+                    <span class="font-medium text-sm">Window/Level Presets:</span>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="setWindowLevel('pan')"
+                            class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+                            Pan
+                        </button>
+                        <button onclick="setWindowLevel('soft_tissue')"
+                            class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
+                            Soft Tissue
+                        </button>
+                        <button onclick="setWindowLevel('lung')"
+                            class="px-3 py-1 bg-cyan-500 text-white rounded text-sm hover:bg-cyan-600">
+                            Lung
+                        </button>
+                        <button onclick="setWindowLevel('bone')"
+                            class="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700">
+                            Bone
+                        </button>
+                        <button onclick="setWindowLevel('brain')"
+                            class="px-3 py-1 bg-pink-500 text-white rounded text-sm hover:bg-pink-600">
+                            Brain
+                        </button>
+                        <button onclick="setWindowLevel('liver')"
+                            class="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600">
+                            Liver
+                        </button>
+                        <button onclick="setWindowLevel('custom')"
+                            class="px-3 py-1 bg-indigo-500 text-white rounded text-sm hover:bg-indigo-600">
+                            Custom
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium">Window:</label>
+                        <input type="range" id="windowSlider" min="1" max="4000" value="2000" class="w-32"
+                            onchange="updateWindowLevel()">
+                        <span id="windowValue" class="text-sm w-16">2000</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm font-medium">Level:</label>
+                        <input type="range" id="levelSlider" min="-1000" max="3000" value="1000" class="w-32"
+                            onchange="updateWindowLevel()">
+                        <span id="levelValue" class="text-sm w-16">1000</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CT Slice Slider -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-4">
+                    <label class="text-sm font-medium">CT Slice Navigation:</label>
+                    <input type="range" id="sliceSlider" min="0" max="209" value="0" class="flex-1"
+                        onchange="goToSlice(this.value)">
+                    <div class="text-sm">
+                        <span id="sliceInfo">Slice 1 / 210</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="viewer-container">
+                <div class="viewer-panel">
+                    <canvas id="ctViewer1" class="viewer-canvas"></canvas>
+                    <div class="viewer-overlay viewer-label" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_dicom_label|default:'RTSTRUCT 1'|truncatechars:50 }}</div>
+                    <div class="viewer-overlay viewer-zoom" id="zoom1">100%</div>
+                </div>
+                <div class="viewer-panel">
+                    <canvas id="ctViewer2" class="viewer-canvas"></canvas>
+                    <div class="viewer-overlay viewer-label" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_dicom_label|default:'RTSTRUCT 2'|truncatechars:50 }}</div>
+                    <div class="viewer-overlay viewer-zoom" id="zoom2">100%</div>
+                </div>
+            </div>
+            
+            <!-- Zoom Controls -->
+            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <span class="font-medium text-sm">Zoom Controls:</span>
+                        <div class="flex gap-2">
+                            <button onclick="zoomIn(1)"
+                                class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition">
+                                + Zoom In 1
+                            </button>
+                            <button onclick="zoomOut(1)"
+                                class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition">
+                                - Zoom Out 1
+                            </button>
+                            <button onclick="resetZoom(1)"
+                                class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition">
+                                Reset 1
+                            </button>
+                        </div>
+                        <div class="flex gap-2 mx-4">
+                            <button onclick="zoomIn(2)"
+                                class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition">
+                                + Zoom In 2
+                            </button>
+                            <button onclick="zoomOut(2)"
+                                class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition">
+                                - Zoom Out 2
+                            </button>
+                            <button onclick="resetZoom(2)"
+                                class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition">
+                                Reset 2
+                            </button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="zoomBoth('in')"
+                                class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition">
+                                + Zoom Both
+                            </button>
+                            <button onclick="zoomBoth('out')"
+                                class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition">
+                                - Zoom Both
+                            </button>
+                            <button onclick="resetBothZoom()"
+                                class="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition">
+                                Reset Both
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        Use mouse wheel to navigate slices, click & drag to pan
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Common ROI Controls -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <h3 class="text-lg font-semibold mb-3">Common ROI Overlays</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {% for structure in common_structures %}
+                <div class="flex items-center">
+                    <input type="checkbox" id="roi_{{ forloop.counter0 }}"
+                        class="mr-2 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                        onchange="toggleROI('{{ structure }}', {{ forloop.counter0 }})">
+                    <label for="roi_{{ forloop.counter0 }}" class="text-sm cursor-pointer">
+                        {{ structure }}
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button onclick="selectAllROIs()"
+                    class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+                    Select All
+                </button>
+                <button onclick="clearAllROIs()"
+                    class="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600">
+                    Clear All
+                </button>
+            </div>
+        </div>
+
+        <!-- ROI Ratings -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <h3 class="text-lg font-semibold mb-3">ROI Structure Ratings</h3>
+            <p class="text-sm text-gray-600 mb-4">Rate each structure from 1 to 10 for both RTSTRUCTs.</p>
+            <div id="roiRatingStatus" class="text-sm mb-3 text-gray-600"></div>
+            <div class="mb-4 grid gap-2 text-xs text-gray-500">
+                <div class="flex flex-wrap gap-2">
+                    <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">9-10 Excellent</span>
+                    <span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">7-8 Very good</span>
+                    <span class="px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-100">5-6 Good</span>
+                    <span class="px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-100">3-4 Fair</span>
+                    <span class="px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100">1-2 Needs work</span>
+                </div>
+            </div>
+            <div class="overflow-x-auto rounded border border-gray-200">
+                <table class="w-full min-w-[640px] text-sm" id="roiRatingTable">
+                    <caption class="sr-only">ROI rating controls for RTSTRUCT comparison</caption>
+                    <thead>
+                        <tr class="border-b bg-gray-50">
+                            <th scope="col" class="text-left py-2 px-2 font-semibold">ROI Name</th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold">
+                                <label class="inline-flex items-center gap-1 text-xs text-gray-500">
+                                    <input type="checkbox" id="roiRatingSelectAll">
+                                    <span class="opacity-600">Select ROIs</span>
+                                </label>
+                            </th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_label|default:'RTSTRUCT 1'|truncatechars:30 }}</th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_label|default:'RTSTRUCT 2'|truncatechars:30 }}</th>
+                            <th scope="col" class="text-center py-2 px-2 font-semibold">Comment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for structure in common_structures %}
+                        <tr class="border-b hover:bg-gray-50" data-roi-name="{{ structure }}">
+                            <th scope="row" class="py-2 px-2 font-medium text-left">{{ structure }}</th>
+                            <td class="py-2 px-2 text-center">
+                                <label class="inline-flex items-center gap-1 text-xs text-gray-600">
+                                    <input type="checkbox" class="roi-rating-include">
+                                </label>
+                            </td>
+                            <td class="p-2 text-center">
+                                <div class="rating-control">
+                                    <div class="flex justify-center gap-4">
+                                        <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 1">
+                                            {% for star in '1234567890'|make_list %}
+                                            <label class="inline-flex flex-col items-center text-xs">
+                                                <input type="radio" class="hidden roi-rating-r1 roi-rating-star" name="roi-rating-r1-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
+                                                    data-roi-name="{{ structure }}"
+                                                    data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r1"
+                                                    aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r1">
+                                                <span class="text-xl select-none star-icon">★</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="flex items-center justify-center gap-2 mt-1 text-sm">
+                                            <span id="rating-display-{{ forloop.counter0 }}-r1" class="rating-display" aria-live="polite">Not rated</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-2 text-center">
+                                <div class="rating-control">
+                                    <div class="flex justify-center gap-4">
+                                        <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 2">
+                                            {% for star in '1234567890'|make_list %}
+                                            <label class="inline-flex flex-col items-center text-xs">
+                                                <input type="radio" class="hidden roi-rating-r2 roi-rating-star" name="roi-rating-r2-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
+                                                    data-roi-name="{{ structure }}"
+                                                    data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r2"
+                                                    aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r2">
+                                                <span class="text-xl select-none star-icon">★</span>
+                                            </label>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="flex items-center justify-center gap-2 mt-1 text-sm">
+                                            <span id="rating-display-{{ forloop.counter0 }}-r2" class="rating-display" aria-live="polite">Not rated</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        <td class="py-2 px-2 text-center">
+                            <button type="button"
+                                class="roi-comment-btn px-2 py-1 text-xs border rounded hover:bg-gray-100 transition"
+                                data-roi-name="{{ structure }}"
+                                aria-label="Add comment for {{ structure }}"
+                                title="Add comment">
+                                💬
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="px-2 py-4 flex items-center justify-end gap-3 w-full">
+                <span id="submitRatingStatus" class="text-sm"></span>
+                <button id="submitAllRatingsBtn" type="button"
+                    class="flex flex-end justify-end px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-sm font-semibold">
+                    Submit Ratings
+                </button>
+            </div>
+        </div>
+
+        <!-- Comment Modal -->
+        <div id="commentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+                <h4 class="text-md font-semibold mb-1">Comment for <span id="commentModalRoiName"></span></h4>
+                <textarea id="commentModalText" rows="4"
+                    class="w-full border rounded p-2 text-sm mt-2 resize-none" placeholder="Enter your comment..."></textarea>
+                <div class="mt-3 flex justify-end gap-2">
+                    <button type="button" id="commentModalCancel"
+                        class="px-4 py-2 border rounded text-sm hover:bg-gray-100 transition">Cancel</button>
+                    <button type="button" id="commentModalSave"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 transition">Save</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script>
+        window.dicomViewerData = {
+            ctData: {{ ct_data|safe }},
+            rt1Contours: {{ rt1_contours|safe }},
+            rt2Contours: {{ rt2_contours|safe }},
+            commonStructures: {{ common_structures|safe }},
+            patientId: "{{ patient_id|escapejs }}",
+            rt1Label: "{{ rt1_label|default:'RTSTRUCT 1'|escapejs }}",
+            rt2Label: "{{ rt2_label|default:'RTSTRUCT 2'|escapejs }}",
+            rt1SopUid: "{{ rt1_sop_uid|default:''|escapejs }}",
+            rt2SopUid: "{{ rt2_sop_uid|default:''|escapejs }}",
+            studyUid: "{{ study_uid|default:''|escapejs }}",
+            initialFeedback: {{ initial_feedback|default:'null'|safe }},
+            roiData: {{ roi_data|default:'{}'|safe }}
+        };
+    </script>
+    <script src="{% static 'rtstructcompare/js/dicom_web_viewer.js' %}"></script>
+</body>
+
+</html>
