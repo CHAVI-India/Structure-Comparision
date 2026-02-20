@@ -4,10 +4,12 @@ Essential functions only: home, patients, dicom_web_viewer
 """
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponseForbidden
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
@@ -76,6 +78,44 @@ def patients(request):
         page_size=8
     )
     return render(request, 'patients.html', context)
+
+
+def _redirect_back(request):
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        return redirect(next_url)
+    return redirect('patients')
+
+
+@login_required
+@require_http_methods(["POST"])
+def remove_patient_access(request, patient_uuid):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+
+    patient = get_object_or_404(Patient, id=patient_uuid)
+    deleted_direct, _ = PatientAssignment.objects.filter(patient=patient).delete()
+    deleted_group, _ = GroupPatientAssignment.objects.filter(patient=patient).delete()
+
+    messages.success(
+        request,
+        f"Removed {deleted_direct} direct and {deleted_group} group assignment(s) for {patient.patient_id or patient.id}.",
+    )
+    return _redirect_back(request)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_patient(request, patient_uuid):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+
+    patient = get_object_or_404(Patient, id=patient_uuid)
+    identifier = patient.patient_id or str(patient_uuid)
+    patient.delete()
+
+    messages.success(request, f"Deleted patient {identifier} and related data.")
+    return _redirect_back(request)
 
 
 @login_required

@@ -23,6 +23,8 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
     path('patients/', views.patients, name='patients'),
     path('patients/<uuid:patient_uuid>/', views.dicom_web_viewer, name='dicom_web_viewer_patient'),
+    path('patients/<uuid:patient_uuid>/remove-access/', views.remove_patient_access, name='remove_patient_access'),
+    path('patients/<uuid:patient_uuid>/delete/', views.delete_patient, name='delete_patient'),
     
     path('api/load-dicom-data/', views.load_dicom_data, name='load_dicom_data'),
     path('api/get-dicom-slice/', views.get_dicom_slice, name='get_dicom_slice'),

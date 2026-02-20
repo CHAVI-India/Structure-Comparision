@@ -145,6 +145,24 @@
                         {% endif %}
                     </a>
                 </div>
+                    {% if is_admin %}
+                        <div class="admin-action-bar">
+                            <form method="post" action="{% url 'remove_patient_access' patient_data.patient.id %}" class="inline-admin-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="admin-action-btn text-blue-500 px-4 py-2 rounded-full border border-blue-500" title="Remove all current reviewers for this patient" onclick="return confirm('Remove all assignments for {{ patient_data.patient.patient_id }}?');">
+                                    Remove access
+                                </button>
+                            </form>
+                            <form method="post" action="{% url 'delete_patient' patient_data.patient.id %}" class="inline-admin-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="admin-action-btn text-red-500 px-4 py-2 rounded-full border border-red-500" title="Delete patient record and associated data" onclick="return confirm('Delete patient {{ patient_data.patient.patient_id }} and all associated data? This cannot be undone.');">
+                                    Delete patient
+                                </button>
+                            </form>
+                        </div>
+                    {% endif %}
             </div>
             {% endfor %}
             {% if is_paginated %}

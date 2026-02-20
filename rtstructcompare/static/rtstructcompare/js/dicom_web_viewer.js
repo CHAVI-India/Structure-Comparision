@@ -731,6 +731,9 @@ async function submitAllRatings() {
 const initializePage = () => {
     initializeViewer();
     initRatings();
+    if (window.Loader && typeof window.Loader.hide === 'function') {
+        window.Loader.hide();
+    }
 };
 
 if (document.readyState === 'loading') {
@@ -738,3 +741,4 @@ if (document.readyState === 'loading') {
 } else {
     initializePage();
 }
+

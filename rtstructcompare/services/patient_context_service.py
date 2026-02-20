@@ -1,3 +1,4 @@
+from collections import defaultdict
 from urllib.parse import urlencode
 
 from django.core.paginator import Paginator
@@ -108,6 +109,17 @@ def build_patient_context(
     )
     feedback_count_map = {entry["patient_id"]: entry["total"] for entry in feedback_counts}
 
+    common_roi_entries = (
+        Roi.objects.filter(rtstruct__instance__series__study__patient__in=patients_qs)
+        .values("rtstruct__instance__series__study__patient_id", "roi_label")
+        .annotate(rtstruct_total=Count("rtstruct_id", distinct=True))
+        .filter(rtstruct_total__gte=2)
+    )
+    common_roi_map = defaultdict(int)
+    for entry in common_roi_entries:
+        patient_id = entry["rtstruct__instance__series__study__patient_id"]
+        common_roi_map[patient_id] += 1
+
     patients_data = []
     for patient in patients_qs:
         studies = DICOMStudy.objects.filter(patient=patient)
@@ -126,12 +138,13 @@ def build_patient_context(
             })
 
         total_rois = roi_count_map.get(patient.id, 0)
+        total_common_rois = common_roi_map.get(patient.id, 0)
         feedback_roi_count = feedback_count_map.get(patient.id, 0)
-        pending_roi_count = max(total_rois - feedback_roi_count, 0)
+        pending_common_roi_count = max(total_common_rois - feedback_roi_count, 0)
 
-        if total_rois == 0 or feedback_roi_count == 0:
+        if total_common_rois == 0 or feedback_roi_count == 0:
             feedback_state = "not_started"
-        elif pending_roi_count == 0:
+        elif pending_common_roi_count == 0:
             feedback_state = "done"
         else:
             feedback_state = "pending"
@@ -141,8 +154,9 @@ def build_patient_context(
             "total_studies": patient_studies_count,
             "total_series": patient_series_count,
             "total_rois": total_rois,
+            "total_common_rois": total_common_rois,
             "feedback_roi_count": feedback_roi_count,
-            "pending_roi_count": pending_roi_count,
+            "pending_roi_count": pending_common_roi_count,
             "feedback_status": feedback_state,
             "studies": studies_data,
         })
