@@ -91,3 +91,29 @@
     color: #4b5563;
     font-weight: 600;
 }
+
+.btn-submit-rating {
+    background: linear-gradient(135deg, #0f766e 0%, #14b8a6 55%, #38bdf8 110%);
+    color: white;
+    border: none;
+    border-radius: 0.9rem;
+    padding: 0.9rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 16px 28px -22px rgba(15, 118, 110, 0.8);
+    width: 20%;
+    justify-content: center;
+}
+
+.btn-submit-rating:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 30px -24px rgba(15, 118, 110, 0.8);
+    color: white;
+    text-decoration: none;
+}

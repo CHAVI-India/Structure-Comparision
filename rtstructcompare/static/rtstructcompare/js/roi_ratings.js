@@ -10,11 +10,14 @@
     const initialFeedback = viewerData.initialFeedback || null;
     const roiData = viewerData.roiData || {};
 
+    let initialUiSnapshot = null;
+
     // In-memory store for comments (keyed by ROI name)
     const roiComments = {};
     let activeCommentRoi = null;
     let initialized = false;
     let currentSubmitController = null;
+    let submitStatusHideTimer = null;
 
     function getCookie(name) {
         const cookieValue = document.cookie
@@ -43,7 +46,22 @@
         } else if (level === 'warning') {
             statusEl.className = 'text-sm text-yellow-600';
         } else {
-            statusEl.className = 'text-sm text-gray-600';
+            statusEl.className = 'text-sm text-teal-600';
+        }
+
+        // Auto-hide submit status after a short delay
+        if (statusEl.id === 'submitRatingStatus') {
+            if (submitStatusHideTimer) {
+                window.clearTimeout(submitStatusHideTimer);
+                submitStatusHideTimer = null;
+            }
+            const shouldAutoHide = text && String(text).trim().length;
+            if (shouldAutoHide) {
+                submitStatusHideTimer = window.setTimeout(() => {
+                    statusEl.textContent = '';
+                    submitStatusHideTimer = null;
+                }, 5000);
+            }
         }
     }
 
@@ -72,7 +90,15 @@
         const selector = `.roi-rating-${type}[data-roi-name="${roiName}"]`;
         const checked = document.querySelector(`${selector}:checked`);
         const value = checked ? parseInt(checked.value, 10) : 0;
-        const displayId = checked ? checked.getAttribute('aria-describedby') : null;
+        let displayId = checked ? checked.getAttribute('aria-describedby') : null;
+        if (!displayId) {
+            const row = document.querySelector(`#roiRatingTable tbody tr[data-roi-name="${roiName}"]`);
+            if (row && row.parentElement) {
+                const rows = Array.from(row.parentElement.querySelectorAll('tr'));
+                const idx = rows.indexOf(row);
+                if (idx >= 0) displayId = `rating-display-${idx}-${type}`;
+            }
+        }
         const displayEl = displayId ? document.getElementById(displayId) : null;
         if (displayEl) displayEl.textContent = value > 0 ? `${value}/10` : 'Not rated';
         updateStarColors(roiName, type, value);
@@ -132,6 +158,76 @@
             const cb = row ? row.querySelector('.roi-rating-include') : null;
             if (cb) cb.checked = true;
         }
+    }
+
+    function filterRoiRows(query) {
+        const q = String(query || '').trim().toLowerCase();
+        const rows = document.querySelectorAll('#roiRatingTable tbody tr');
+        rows.forEach((row) => {
+            const roiName = (row.dataset.roiName || '').toLowerCase();
+            row.style.display = !q || roiName.includes(q) ? '' : 'none';
+        });
+    }
+
+    function captureInitialUiSnapshot() {
+        const snapshot = {
+            include: {},
+            r1: {},
+            r2: {},
+            comments: {},
+        };
+
+        document.querySelectorAll('#roiRatingTable tbody tr').forEach((row) => {
+            const roiName = row.dataset.roiName;
+            if (!roiName) return;
+
+            const includeCb = row.querySelector('.roi-rating-include');
+            snapshot.include[roiName] = !!(includeCb && includeCb.checked);
+
+            const r1Input = row.querySelector('.roi-rating-r1:checked');
+            const r2Input = row.querySelector('.roi-rating-r2:checked');
+            snapshot.r1[roiName] = r1Input ? parseInt(r1Input.value, 10) : null;
+            snapshot.r2[roiName] = r2Input ? parseInt(r2Input.value, 10) : null;
+        });
+
+        Object.keys(roiComments).forEach((k) => {
+            snapshot.comments[k] = roiComments[k];
+        });
+
+        return snapshot;
+    }
+
+    function restoreUiSnapshot(snapshot) {
+        if (!snapshot) return;
+
+        // Restore comments
+        Object.keys(roiComments).forEach((k) => delete roiComments[k]);
+        Object.keys(snapshot.comments || {}).forEach((k) => {
+            roiComments[k] = snapshot.comments[k];
+        });
+        updateCommentButtons();
+
+        // Restore include + ratings
+        document.querySelectorAll('#roiRatingTable tbody tr').forEach((row) => {
+            const roiName = row.dataset.roiName;
+            if (!roiName) return;
+
+            const includeCb = row.querySelector('.roi-rating-include');
+            if (includeCb) includeCb.checked = !!(snapshot.include && snapshot.include[roiName]);
+
+            const r1Val = snapshot.r1 ? snapshot.r1[roiName] : null;
+            const r2Val = snapshot.r2 ? snapshot.r2[roiName] : null;
+
+            row.querySelectorAll('.roi-rating-r1').forEach((input) => {
+                input.checked = r1Val != null && String(input.value) === String(r1Val);
+            });
+            row.querySelectorAll('.roi-rating-r2').forEach((input) => {
+                input.checked = r2Val != null && String(input.value) === String(r2Val);
+            });
+
+            updateRatingDisplayForRoi(roiName, 'r1');
+            updateRatingDisplayForRoi(roiName, 'r2');
+        });
     }
 
     async function submitAllRatings() {
@@ -263,6 +359,24 @@
             });
         }
 
+        // Load existing comments and include state
+        if (initialFeedback) {
+            Object.keys(initialFeedback).forEach((roiName) => {
+                const fb = initialFeedback[roiName];
+                if (!fb) return;
+
+                if (fb.comment) {
+                    roiComments[roiName] = fb.comment;
+                }
+
+                const row = document.querySelector(`#roiRatingTable tbody tr[data-roi-name="${roiName}"]`);
+                const cb = row ? row.querySelector('.roi-rating-include') : null;
+                if (cb) {
+                    cb.checked = !!(fb.include != null ? fb.include : fb.rt1_rating != null || fb.rt2_rating != null || fb.comment);
+                }
+            });
+        }
+
         // Initialize displays for rows without initial feedback
         document.querySelectorAll('.roi-rating-r1').forEach((input) => {
             updateRatingDisplayForRoi(input.dataset.roiName, 'r1');
@@ -287,6 +401,40 @@
 
         // Update comment button indicators
         updateCommentButtons();
+
+        // Capture the initial UI state (after applying initial feedback)
+        initialUiSnapshot = captureInitialUiSnapshot();
+
+        // ROI search filter
+        const roiSearch = document.getElementById('roiSearchFilter');
+        if (roiSearch) {
+            roiSearch.addEventListener('input', () => {
+                filterRoiRows(roiSearch.value);
+            });
+        }
+
+        const roiSearchClearBtn = document.getElementById('roiSearchClearBtn');
+        if (roiSearchClearBtn && roiSearch) {
+            roiSearchClearBtn.addEventListener('click', () => {
+                roiSearch.value = '';
+                filterRoiRows('');
+                roiSearch.focus();
+            });
+        }
+
+        // Reset modified ratings (reset to initial state)
+        const clearBtn = document.getElementById('clearAllRatingsBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                const statusEl = document.getElementById('submitRatingStatus');
+                restoreUiSnapshot(initialUiSnapshot);
+                if (roiSearch) {
+                    roiSearch.value = '';
+                    filterRoiRows('');
+                }
+                setStatus(statusEl, 'Reset to previously saved ratings.', 'info');
+            });
+        }
 
         // Submit button
         const submitBtn = document.getElementById('submitAllRatingsBtn');

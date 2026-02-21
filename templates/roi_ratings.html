@@ -1,6 +1,11 @@
 <!-- ROI Ratings -->
 <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-    <h3 class="text-lg font-semibold mb-3">ROI Structure Ratings</h3>
+    <div class="flex justify-between items-center">
+        <h3 class="text-xl font-semibold mb-3">ROI Structure Ratings</h3>
+        <button class="px-3 py-1 rounded-full bg-emerald-50 text-sm text-emerald-700 border border-emerald-100 hover:bg-teal-600 hover:text-teal-100 transition">
+            <a href="{% url 'patients' %}">Go To Patient Page</a>
+        </button>
+    </div>
     <p class="text-sm text-gray-600 mb-4">Rate each structure from 1 to 10 for both RTSTRUCTs.</p>
     <div id="roiRatingStatus" class="text-sm mb-3 text-gray-600"></div>
     <div class="mb-4 grid gap-2 text-xs text-gray-500">
@@ -10,6 +15,26 @@
             <span class="px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-100">5-6 Good</span>
             <span class="px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-100">3-4 Fair</span>
             <span class="px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100">1-2 Needs work</span>
+        </div>
+    </div>
+    <div class="flex flex-col md:flex-row md:items-end gap-3 mb-4">
+        <div class="w-full md:w-1/2">
+            <label for="roiSearchFilter" class="block text-xs font-medium text-gray-600 mb-1">Search ROI</label>
+            <div class="flex items-stretch gap-2">
+                <input id="roiSearchFilter" type="text"
+                    class="w-2/4 border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+                    placeholder="Type to filter ROI names..." autocomplete="off">
+                <button id="roiSearchClearBtn" type="button"
+                    class="px-4 py-2 border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap">
+                    Clear
+                </button>
+            </div>
+        </div>
+        <div class="flex-1 flex items-end justify-end">
+            <button id="clearAllRatingsBtn" type="button"
+                class="px-6 py-2 border border-rose-200 bg-rose-50 text-rose-700 rounded-md text-sm font-medium hover:bg-rose-100 transition whitespace-nowrap">
+                Reset Ratings
+            </button>
         </div>
     </div>
     <div class="overflow-x-auto rounded border border-gray-200">
@@ -91,10 +116,10 @@
                 {% endfor %}
             </tbody>
         </table>
-        <div class="px-2 py-4 flex items-center justify-end gap-3 w-full">
-            <span id="submitRatingStatus" class="text-sm"></span>
+        <div class="px-3 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full bg-gray-50 border-t border-gray-200">
+            <span id="submitRatingStatus" class="text-sm text-gray-600"></span>
             <button id="submitAllRatingsBtn" type="button"
-                class="flex flex-end justify-end px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-sm font-semibold">
+                class="btn-submit-rating">
                 Submit Ratings
             </button>
         </div>
