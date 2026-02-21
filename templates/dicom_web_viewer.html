@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DICOM CT & RTSTRUCT Viewer</title>
+    <title>RTSTRUCT Comparison & Ratings</title>
     <script src="https://cdn.tailwindcss.com"></script>
     {% block extra_css %}
     {% load static %}
     <link rel="stylesheet" href="{% static 'rtstructcompare/css/dicom_web_viewer.css' %}">
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/roi_ratings.css' %}">
     {% endblock %}
     <link rel="stylesheet" href="{% static 'rtstructcompare/css/loading_spinner.css' %}">
 </head>
@@ -16,11 +17,7 @@
 <body class="bg-gray-100">
     {% include "loading_spinner.html" %}
     <div class="container mx-auto p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-6">DICOM CT & RTSTRUCT Viewer</h1>
-            <button class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded"><a href="{% url 'patients' %}"><- Back To Patient Page</a></button>
-        </div>
-
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">RTSTRUCT Comparison & Ratings</h1>
         <!-- Patient Info -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-6">
             <h2 class="text-xl font-semibold mb-3">Patient Information</h2>
@@ -225,7 +222,7 @@
 
         <!-- Common ROI Controls -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-            <h3 class="text-lg font-semibold mb-3">Common ROI Overlays</h3>
+            <h3 class="text-xl font-semibold mb-3">Common ROI Overlays</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {% for structure in common_structures %}
                 <div class="flex items-center">
@@ -250,122 +247,7 @@
             </div>
         </div>
 
-        <!-- ROI Ratings -->
-        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-            <h3 class="text-lg font-semibold mb-3">ROI Structure Ratings</h3>
-            <p class="text-sm text-gray-600 mb-4">Rate each structure from 1 to 10 for both RTSTRUCTs.</p>
-            <div id="roiRatingStatus" class="text-sm mb-3 text-gray-600"></div>
-            <div class="mb-4 grid gap-2 text-xs text-gray-500">
-                <div class="flex flex-wrap gap-2">
-                    <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">9-10 Excellent</span>
-                    <span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">7-8 Very good</span>
-                    <span class="px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-100">5-6 Good</span>
-                    <span class="px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-100">3-4 Fair</span>
-                    <span class="px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100">1-2 Needs work</span>
-                </div>
-            </div>
-            <div class="overflow-x-auto rounded border border-gray-200">
-                <table class="w-full min-w-[640px] text-sm" id="roiRatingTable">
-                    <caption class="sr-only">ROI rating controls for RTSTRUCT comparison</caption>
-                    <thead>
-                        <tr class="border-b bg-gray-50">
-                            <th scope="col" class="text-left py-2 px-2 font-semibold">ROI Name</th>
-                            <th scope="col" class="text-center py-2 px-2 font-semibold">
-                                <label class="inline-flex items-center gap-1 text-xs text-gray-500">
-                                    <input type="checkbox" id="roiRatingSelectAll">
-                                    <span class="opacity-600">Select ROIs</span>
-                                </label>
-                            </th>
-                            <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_label|default:'RTSTRUCT 1'|truncatechars:30 }}</th>
-                            <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_label|default:'RTSTRUCT 2'|truncatechars:30 }}</th>
-                            <th scope="col" class="text-center py-2 px-2 font-semibold">Comment</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for structure in common_structures %}
-                        <tr class="border-b hover:bg-gray-50" data-roi-name="{{ structure }}">
-                            <th scope="row" class="py-2 px-2 font-medium text-left">{{ structure }}</th>
-                            <td class="py-2 px-2 text-center">
-                                <label class="inline-flex items-center gap-1 text-xs text-gray-600">
-                                    <input type="checkbox" class="roi-rating-include">
-                                </label>
-                            </td>
-                            <td class="p-2 text-center">
-                                <div class="rating-control">
-                                    <div class="flex justify-center gap-4">
-                                        <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 1">
-                                            {% for star in '1234567890'|make_list %}
-                                            <label class="inline-flex flex-col items-center text-xs">
-                                                <input type="radio" class="hidden roi-rating-r1 roi-rating-star" name="roi-rating-r1-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
-                                                    data-roi-name="{{ structure }}"
-                                                    data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r1"
-                                                    aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r1">
-                                                <span class="text-xl select-none star-icon">★</span>
-                                            </label>
-                                            {% endfor %}
-                                        </div>
-                                        <div class="flex items-center justify-center gap-2 mt-1 text-sm">
-                                            <span id="rating-display-{{ forloop.counter0 }}-r1" class="rating-display" aria-live="polite">Not rated</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="p-2 text-center">
-                                <div class="rating-control">
-                                    <div class="flex justify-center gap-4">
-                                        <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 2">
-                                            {% for star in '1234567890'|make_list %}
-                                            <label class="inline-flex flex-col items-center text-xs">
-                                                <input type="radio" class="hidden roi-rating-r2 roi-rating-star" name="roi-rating-r2-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
-                                                    data-roi-name="{{ structure }}"
-                                                    data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r2"
-                                                    aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r2">
-                                                <span class="text-xl select-none star-icon">★</span>
-                                            </label>
-                                            {% endfor %}
-                                        </div>
-                                        <div class="flex items-center justify-center gap-2 mt-1 text-sm">
-                                            <span id="rating-display-{{ forloop.counter0 }}-r2" class="rating-display" aria-live="polite">Not rated</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                        <td class="py-2 px-2 text-center">
-                            <button type="button"
-                                class="roi-comment-btn px-2 py-1 text-xs border rounded hover:bg-gray-100 transition"
-                                data-roi-name="{{ structure }}"
-                                aria-label="Add comment for {{ structure }}"
-                                title="Add comment">
-                                💬
-                            </button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <div class="px-2 py-4 flex items-center justify-end gap-3 w-full">
-                <span id="submitRatingStatus" class="text-sm"></span>
-                <button id="submitAllRatingsBtn" type="button"
-                    class="flex flex-end justify-end px-5 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition text-sm font-semibold">
-                    Submit Ratings
-                </button>
-            </div>
-        </div>
-
-        <!-- Comment Modal -->
-        <div id="commentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40">
-            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-                <h4 class="text-md font-semibold mb-1">Comment for <span id="commentModalRoiName"></span></h4>
-                <textarea id="commentModalText" rows="4"
-                    class="w-full border rounded p-2 text-sm mt-2 resize-none" placeholder="Enter your comment..."></textarea>
-                <div class="mt-3 flex justify-end gap-2">
-                    <button type="button" id="commentModalCancel"
-                        class="px-4 py-2 border rounded text-sm hover:bg-gray-100 transition">Cancel</button>
-                    <button type="button" id="commentModalSave"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 transition">Save</button>
-                </div>
-            </div>
-        </div>
+        {% include "roi_ratings.html" %}
 
     </div>
     <script>
@@ -386,6 +268,7 @@
     </script>
     <script src="{% static 'rtstructcompare/js/loading_spinner.js' %}"></script>
     <script src="{% static 'rtstructcompare/js/dicom_web_viewer.js' %}"></script>
+    <script src="{% static 'rtstructcompare/js/roi_ratings.js' %}"></script>
 </body>
 
 </html>
