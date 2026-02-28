@@ -5,15 +5,31 @@
     --muted: #64748b;
     --accent: #0f766e;
     --accent-strong: #115e59;
-    --accent-soft: #ccfbf1;
+    --accent-soft: rgba(204, 251, 241, 0.72);
     --surface: #ffffff;
     --border: #e2e8f0;
     --shadow: 0 24px 50px -35px rgba(15, 23, 42, 0.6);
     --shadow-soft: 0 18px 35px -30px rgba(15, 23, 42, 0.55);
+    --radius-card: 1.35rem;
+    --radius-inner: 1.05rem;
+    --radius-control: 0.85rem;
+    --radius-pill: 999px;
+    --space-1: 0.5rem;
+    --space-2: 0.75rem;
+    --space-3: 1rem;
+    --space-4: 1.25rem;
+    --space-5: 1.6rem;
+    --focus-ring: 0 0 0 3px rgba(15, 118, 110, 0.15);
+    --shadow-card: 0 18px 40px -34px rgba(15, 23, 42, 0.75);
+    --shadow-card-hover: 0 26px 48px -40px rgba(15, 23, 42, 0.78);
+    --shadow-tile: 0 12px 22px -22px rgba(15, 23, 42, 0.55);
+    --header-bg-3: rgba(255, 255, 255, 0.98);
 }
 
 .patient-page {
     min-height: 100vh;
+    width: 100%;
+    margin: 1.5rem auto;
     position: relative;
     overflow: hidden;
     font-family: 'IBM Plex Sans', 'Space Grotesk', sans-serif;
@@ -40,8 +56,8 @@
 .page-header {
     text-align: left;
     margin-bottom: 2rem;
-    padding: 2.5rem;
-    background: rgba(255, 255, 255, 0.92);
+    padding: 2.1rem;
+    background-color: var(--header-bg-3);
     border-radius: 1.6rem;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
@@ -50,6 +66,22 @@
     flex-direction: column;
     gap: 1.75rem;
     animation: fadeUp 0.6s ease both;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.14), transparent 58%),
+        radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.12), transparent 62%);
+    opacity: 0.75;
+    pointer-events: none;
+}
+
+.page-header > * {
+    position: relative;
+    z-index: 1;
 }
 
 .page-header-top {
@@ -88,7 +120,7 @@
     align-items: baseline;
     gap: 0.35rem;
     padding: 0.5rem 0.95rem;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: var(--accent-soft);
     color: var(--accent-strong);
     font-weight: 600;
@@ -110,7 +142,7 @@
     justify-content: space-between;
     gap: 1rem;
     padding: 1rem 1.25rem;
-    background: var(--surface);
+    /* background: var(--surface); */
     border-radius: 1.1rem;
     border: 1px solid var(--border);
 }
@@ -164,7 +196,7 @@
 .filter-select {
     min-width: 220px;
     padding: 0.65rem 0.85rem;
-    border-radius: 0.85rem;
+    border-radius: var(--radius-control);
     border: 1px solid rgba(15, 118, 110, 0.3);
     background: #ffffff;
     font-size: 0.95rem;
@@ -176,7 +208,7 @@
 
 .filter-select:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+    box-shadow: var(--focus-ring);
 }
 
 .filter-search-input {
@@ -191,7 +223,7 @@
 .filter-input {
     flex: 1 1 220px;
     padding: 0.65rem 0.3rem 0.65rem 0.85rem;
-    border-radius: 0.85rem;
+    border-radius: var(--radius-control);
     border: 1px solid rgba(15, 118, 110, 0.3);
     background: #ffffff;
     font-size: 0.95rem;
@@ -203,7 +235,7 @@
 
 .filter-input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+    box-shadow: var(--focus-ring);
 }
 
 .filter-input[type="search"]::-webkit-search-cancel-button {
@@ -215,15 +247,15 @@
 
 .patient-card {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.92) 100%);
-    border-radius: 1.35rem;
-    padding: 1.6rem;
+    border-radius: var(--radius-card);
+    padding: var(--space-5);
     margin-bottom: 0;
-    box-shadow: 0 18px 40px -34px rgba(15, 23, 42, 0.75);
+    box-shadow: var(--shadow-card);
     border: 1px solid rgba(226, 232, 240, 0.9);
     transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
+    gap: var(--space-4);
     position: relative;
     overflow: hidden;
     animation: fadeUp 0.6s ease both;
@@ -254,8 +286,8 @@
 }
 
 .patient-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 30px 55px -44px rgba(15, 23, 42, 0.8);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card-hover);
     border-color: rgba(15, 118, 110, 0.42);
 }
 
@@ -310,7 +342,7 @@
 
 .detail-empty {
     padding: 0.5rem 0.75rem;
-    border-radius: 0.85rem;
+    border-radius: var(--radius-control);
     background: rgba(148, 163, 184, 0.12);
     border: 1px dashed rgba(148, 163, 184, 0.35);
 }
@@ -328,13 +360,13 @@
     border: 1px solid rgba(226, 232, 240, 0.95);
     background: rgba(255, 255, 255, 0.94);
     color: rgba(30, 64, 175, 0.95);
-    border-radius: 0.85rem;
+    border-radius: var(--radius-control);
     padding: 0.45rem 0.75rem;
     font-size: 0.85rem;
     font-weight: 600;
     min-width: 125px;
     transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-    box-shadow: 0 12px 22px -18px rgba(15, 23, 42, 0.55);
+    box-shadow: var(--shadow-tile);
 }
 
 .inline-admin-form button[type="submit"] {
@@ -371,10 +403,10 @@
 
 .patient-card > div:last-child > div:first-child > div {
     padding: 0.95rem 1rem;
-    border-radius: 1.05rem;
+    border-radius: var(--radius-inner);
     border: 1px solid rgba(226, 232, 240, 0.9);
     background: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 14px 24px -26px rgba(15, 23, 42, 0.65);
+    box-shadow: var(--shadow-tile);
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
@@ -409,7 +441,7 @@
     background: linear-gradient(135deg, #0f766e 0%, #14b8a6 55%, #38bdf8 110%);
     color: white;
     border: none;
-    border-radius: 0.95rem;
+    border-radius: calc(var(--radius-inner) - 0.1rem);
     padding: 0.85rem 1.25rem;
     font-size: 0.95rem;
     font-weight: 600;

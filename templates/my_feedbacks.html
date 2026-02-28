@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Feedback{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">My Feedback</h1>
+            <p class="text-sm text-slate-600">Feedback entries submitted by you.</p>
+        </div>
+    </div>
+
+    <form method="get" class="bg-white border border-slate-200 rounded p-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Search</label>
+                <input class="w-full border border-slate-300 rounded px-3 py-2 text-sm" type="text" name="q" value="{{ params.q }}" placeholder="patient, ROI, comment">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Patient ID</label>
+                <input class="w-full border border-slate-300 rounded px-3 py-2 text-sm" type="text" name="patient_id" value="{{ params.patient_id }}">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">ROI Label</label>
+                <input class="w-full border border-slate-300 rounded px-3 py-2 text-sm" type="text" name="roi_label" value="{{ params.roi_label }}">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Rating</label>
+                <input class="w-full border border-slate-300 rounded px-3 py-2 text-sm" type="text" name="rating" value="{{ params.rating }}" placeholder="1-10">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Updated From</label>
+                <input class="w-full border border-slate-300 rounded px-3 py-2 text-sm" type="date" name="date_from" value="{{ params.date_from }}">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Updated To</label>
+                <input class="w-full border border-slate-300 rounded px-3 py-2 text-sm" type="date" name="date_to" value="{{ params.date_to }}">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Sort By</label>
+                <select class="w-full border border-slate-300 rounded px-3 py-2 text-sm" name="sort_by">
+                    <option value="updated_at" {% if params.sort_by == 'updated_at' %}selected{% endif %}>Updated</option>
+                    <option value="created_at" {% if params.sort_by == 'created_at' %}selected{% endif %}>Created</option>
+                    <option value="patient_id" {% if params.sort_by == 'patient_id' %}selected{% endif %}>Patient ID</option>
+                    <option value="roi" {% if params.sort_by == 'roi' %}selected{% endif %}>ROI</option>
+                    <option value="rt1_rating" {% if params.sort_by == 'rt1_rating' %}selected{% endif %}>RT1 Rating</option>
+                    <option value="rt2_rating" {% if params.sort_by == 'rt2_rating' %}selected{% endif %}>RT2 Rating</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Order</label>
+                <select class="w-full border border-slate-300 rounded px-3 py-2 text-sm" name="order">
+                    <option value="desc" {% if params.order == 'desc' %}selected{% endif %}>Desc</option>
+                    <option value="asc" {% if params.order == 'asc' %}selected{% endif %}>Asc</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Page Size</label>
+                <select class="w-full border border-slate-300 rounded px-3 py-2 text-sm" name="page_size">
+                    <option value="10" {% if params.page_size == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if params.page_size == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if params.page_size == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if params.page_size == 100 %}selected{% endif %}>100</option>
+                </select>
+            </div>
+            <div class="flex items-end gap-2">
+                <button class="px-4 py-2 rounded bg-teal-700 text-white text-sm font-semibold" type="submit">Apply</button>
+                <a class="px-4 py-2 rounded bg-slate-100 text-slate-800 text-sm font-semibold" href="{% url 'my_feedbacks' %}">Reset</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="bg-white border border-slate-200 rounded overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-slate-50 text-slate-700">
+                <tr>
+                    <th class="text-left px-3 py-2">Patient</th>
+                    <th class="text-left px-3 py-2">ROI</th>
+                    <th class="text-left px-3 py-2">RT1 Label</th>
+                    <th class="text-left px-3 py-2">RT1 Rating</th>
+                    <th class="text-left px-3 py-2">RT2 Label</th>
+                    <th class="text-left px-3 py-2">RT2 Rating</th>
+                    <th class="text-left px-3 py-2">Comment</th>
+                    <th class="text-left px-3 py-2">Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for feedback in feedbacks %}
+                    <tr class="border-t border-slate-100">
+                        <td class="px-3 py-2">{{ feedback.patient.patient_id|default:"—" }}</td>
+                        <td class="px-3 py-2">{{ feedback.common_roi_label|default:"—" }}</td>
+                        <td class="px-3 py-2" title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
+                        <td class="px-3 py-2">{{ feedback.rt1_rating|default:"—" }}</td>
+                        <td class="px-3 py-2" title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
+                        <td class="px-3 py-2">{{ feedback.rt2_rating|default:"—" }}</td>
+                        <td class="px-3 py-2">{{ feedback.comment|default:"—"|truncatechars:80 }}</td>
+                        <td class="px-3 py-2">{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td class="px-3 py-8 text-center text-slate-500" colspan="8">No feedback found.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if feedback_page_obj %}
+        <div class="flex flex-wrap items-center justify-between gap-2 mt-4 text-sm">
+            <div class="text-slate-600">Page {{ feedback_page_obj.number }} of {{ feedback_page_obj.paginator.num_pages }} · {{ feedback_page_obj.paginator.count }} results</div>
+            <div class="flex items-center gap-2">
+                {% if feedback_page_obj.has_previous %}
+                    <a class="px-3 py-2 rounded bg-slate-100" href="{{ page_prefix }}page={{ feedback_page_obj.previous_page_number }}">Prev</a>
+                {% endif %}
+                {% if feedback_page_obj.has_next %}
+                    <a class="px-3 py-2 rounded bg-slate-100" href="{{ page_prefix }}page={{ feedback_page_obj.next_page_number }}">Next</a>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
