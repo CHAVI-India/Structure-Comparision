@@ -1,0 +1,96 @@
+<div id="userAssignment" class="assignment-view" hidden aria-labelledby="userBtn">
+    <form method="post" id="assignmentForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="action" value="assign">
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;">
+            <div class="form-control" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                        <div>
+                            <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Users</h4>
+                            <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose the users to receive patients.</p>
+                        </div>
+                        <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ users|length }} total</span>
+                    </div>
+                </div>
+
+                <input type="hidden" name="group_id" id="group_id" value="">
+
+                <input type="text" id="user_search" name="user_search" placeholder="Search users by name" style="border:1px solid #cbd5f5;color:#0f172a;border-radius:14px;padding:10px 14px;font-size:0.9rem;background:#ffffff;">
+
+                <div id="userList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+                    {% if users %}
+                        {% for user in users %}
+                            <label data-label="{{ user.username|lower }} {{ user.email|default:''|lower }}" data-user-id="{{ user.id }}" class="user-card" style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
+                                <input type="checkbox" name="user_ids" value="{{ user.id }}" style="width:16px;height:16px;">
+                                <div>
+                                    <div style="font-weight:600;color:#0f172a;">{{ user.username }}</div>
+                                    <div style="font-size:0.8rem;color:#94a3b8;">{{ user.email|default:'no email on file' }}</div>
+                                </div>
+                                {% if not user.is_staff %}
+                                    <button type="button"
+                                        class="btn btn-outline btn-xs deactivate-user-btn"
+                                        data-user-id="{{ user.id }}"
+                                        data-username="{{ user.username }}"
+                                        style="padding:6px 10px; color:#9f1239; border-radius:999px;font-size:0.8rem;">
+                                        Deactivate
+                                    </button>
+                                {% endif %}
+                            </label>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No users available.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-control" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                    <div>
+                        <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Patients</h4>
+                        <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose one or more patients to assign.</p>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <button type="button" id="selectAssignedPatientsUser" class="btn btn-outline btn-xs" style="padding:6px 10px;border-radius:999px;font-size:0.8rem;">Select assigned</button>
+                        <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ patients|length }} total</span>
+                    </div>
+                </div>
+
+                <input type="text" id="patient_search" name="patient_search" placeholder="Search patients by ID or name" style="border:1px solid #cbd5f5;color:#0f172a;border-radius:14px;padding:10px 14px;font-size:0.9rem;background:#ffffff;">
+
+                <div id="patientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+                    {% if patients %}
+                        {% for patient in patients %}
+                            <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" data-patient-id="{{ patient.id }}" class="patient-card" style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,0.05);">
+                                <input type="checkbox" name="patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
+                                <div>
+                                    <div style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
+                                    <div style="font-size:0.8rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                </div>
+                                <button type="button" class="btn btn-outline btn-xs unassign-patient-user-btn" data-patient-id="{{ patient.id }}" style="padding:6px 10px;border-radius:999px;font-size:0.8rem;">Unassign</button>
+                            </label>
+                        {% endfor %}
+                    {% else %}
+                        <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No patients available.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
+            <button type="button" id="assignActionBtn" class="btn btn-primary" style="border-radius:999px;padding:10px 16px;" disabled>Assign selected</button>
+            <button type="button" id="unassignActionBtn" class="btn btn-danger" style="border-radius:999px;padding:10px 16px;" disabled>Unassign selected</button>
+        </div>
+
+        <style>
+            #assignActionBtn:disabled,
+            #unassignActionBtn:disabled {
+                opacity: 0.55;
+                filter: blur(0.35px) grayscale(0.25);
+                cursor: not-allowed;
+                box-shadow: none;
+            }
+        </style>
+    </form>
+</div>

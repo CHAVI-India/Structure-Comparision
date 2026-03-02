@@ -9,20 +9,23 @@
     {% block extra_css %}{% endblock %}
 </head>
 
-<body>
+<body class="bg-slate-50 text-slate-900">
     <nav class="bg-teal-700 text-white p-4">
-        <div class="container mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div class="mx-auto max-w-screen-2xl px-4 md:px-6 flex flex-wrap items-center justify-between gap-3">
             <a href="/" class="text-xl font-bold">Structure Comparision</a>
             <div class="flex flex-wrap items-center gap-4 text-sm font-semibold">
                 {% if request.user.is_authenticated %}
                     {% if request.user.is_staff %}
                         <a href="{% url 'admin_dashboard' %}" class="hover:text-teal-100">Dashboard</a>
-                        <a href="{% url 'patients' %}" class="hover:text-teal-100">Patients</a>
                         <a href="{% url 'dicom_import' %}" class="hover:text-teal-100">Import DICOM</a>
+                        <a href="{% url 'admin_assignments' %}" class="hover:text-teal-100">Assignments</a>
+                        <a href="{% url 'admin_feedbacks' %}" class="hover:text-teal-100">Feedback</a>
+                        <a href="{% url 'patients' %}" class="hover:text-teal-100">Patients</a>
                         <a href="{% url 'admin:index' %}" class="hover:text-teal-100">Admin Panel</a>
                     {% else %}
                         <a href="{% url 'user_dashboard' %}" class="hover:text-teal-100">Dashboard</a>
                         <a href="{% url 'patients' %}" class="hover:text-teal-100">Assigned Patients</a>
+                        <a href="{% url 'my_feedbacks' %}" class="hover:text-teal-100">My Feedback</a>
                     {% endif %}
                     <form method="post" action="{% url 'logout' %}" class="inline-flex">
                         {% csrf_token %}
@@ -37,13 +40,18 @@
             </div>
         </div>
     </nav>
-    <main class="container mx-auto p-4">
+    <main class="mx-auto max-w-screen-2xl px-4 md:px-6 py-4 md:py-6">
         {% block content %}
         {% endblock %}
     </main>
 
+    {% include 'confirm_modal.html' %}
+
     {% block extra_js %}
     {% endblock %}
+
+    {% load static %}
+    <script src="{% static 'rtstructcompare/js/confirm_modal.js' %}"></script>
 </body>
 
 </html>

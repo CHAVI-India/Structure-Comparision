@@ -12,15 +12,21 @@ from django.contrib.auth import views as auth_views
 from rtstructcompare import views
 
 urlpatterns = [
+    path('admin/feedbacks/', views.admin_feedbacks, name='admin_feedbacks'),
+    path('admin/feedbacks/export.csv', views.export_feedbacks_csv, name='export_feedbacks_csv'),
+    path('admin/feedbacks/export.xlsx', views.export_feedbacks_xlsx, name='export_feedbacks_xlsx'),
+    path('admin/dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('admin/dashboard/charts/', views.admin_dashboard_charts, name='admin_dashboard_charts'),
+    path('admin/assignments/', views.admin_assignments, name='admin_assignments'),
     path('admin/', admin.site.urls),
-    path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('import/', views.dicom_import, name='dicom_import'),
 
-    path('user-dashboard/', views.user_dashboard, name='user_dashboard'),
+    path('user/dashboard/', views.user_dashboard, name='user_dashboard'),
+    path('user/feedbacks/', views.my_feedbacks, name='my_feedbacks'),
 
     path('', views.home, name='home'),
     path('login/', views.RoleBasedLoginView.as_view(template_name='login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
     path('patients/', views.patients, name='patients'),
     path('patients/<uuid:patient_uuid>/', views.dicom_web_viewer, name='dicom_web_viewer_patient'),
     path('patients/<uuid:patient_uuid>/remove-access/', views.remove_patient_access, name='remove_patient_access'),

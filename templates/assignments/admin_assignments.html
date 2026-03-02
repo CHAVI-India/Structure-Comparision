@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Assign Patients - Admin{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'rtstructcompare/js/admin_assignments.js' %}"></script>
+{% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/admin_dashboard.css' %}">
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/admin_assignments.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    <section class="panel mt-6 mb-10">
+        <div class="section-header">
+            <h2>Assign Patients</h2>
+            <div class="assignment-toggle" role="tablist" aria-label="Assignment Mode">
+                <button type="button" id="userBtn" class="btn btn-toggle rounded-full" role="tab" aria-selected="false">User</button>
+                <button type="button" id="groupBtn" class="btn btn-toggle is-active rounded-full" role="tab" aria-selected="true">Group</button>
+            </div>
+            <a class="btn btn-secondary" href="{% url 'patients' %}">View Patient Page</a>
+        </div>
+
+        {% if status_message %}
+            <div class="status {{ status_type }}" data-status-timeout="{{ status_timeout_ms|default:0 }}">
+                <span>{{ status_message }}</span>
+                <button type="button" class="status-close" aria-label="Dismiss">&times;</button>
+            </div>
+        {% endif %}
+
+        {% include 'assignments/_assignment_group_pane.html' %}
+        {% include 'assignments/_assignment_user_pane.html' %}
+    </section>
+
+    <section class="panel assignment-details">
+        <div class="section-header">
+            <h2>Assignment Details</h2>
+        </div>
+
+        <form method="get" class="assignment-filterbar">
+            <div class="assignment-filterrow">
+                <div class="filter-field">
+                    <label class="filter-label" for="assignment_q">Search</label>
+                    <input
+                        id="assignment_q"
+                        name="q"
+                        type="search"
+                        class="filter-input"
+                        placeholder="Patient ID, name, user, or group"
+                        value="{{ assignment_search }}"
+                    />
+                </div>
+
+                <div class="filter-field">
+                    <label class="filter-label" for="assignment_status">Status</label>
+                    <select id="assignment_status" name="status" class="filter-select">
+                        <option value="" {% if not assignment_status %}selected{% endif %}>All</option>
+                        <option value="reviewed" {% if assignment_status == 'reviewed' %}selected{% endif %}>Reviewed</option>
+                        <option value="pending" {% if assignment_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="unassigned" {% if assignment_status == 'unassigned' %}selected{% endif %}>Unassigned</option>
+                    </select>
+                </div>
+
+                <div class="filter-field">
+                    <label class="filter-label" for="assignment_group">Group</label>
+                    <select id="assignment_group" name="group" class="filter-select">
+                        <option value="" {% if not assignment_group_filter %}selected{% endif %}>All groups</option>
+                        {% for group in assignment_groups %}
+                            <option value="{{ group.id }}" {% if assignment_group_filter == group.id|stringformat:"s" %}selected{% endif %}>
+                                {{ group.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-field filter-actions">
+                    <button type="submit" class="btn btn-primary">Apply</button>
+                    <a class="btn btn-secondary" href="{% url 'admin_assignments' %}">Reset</a>
+                </div>
+            </div>
+        </form>
+
+        <div class="table-wrap">
+            <table class="assignment-table">
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>Assigned Users</th>
+                        <th>Groups</th>
+                        <th>Review Status</th>
+                        <th>Last Assigned</th>
+                        <th>Pending Age</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in assignment_rows %}
+                        <tr>
+                            <td>
+                                <strong>{{ row.patient.patient_id }}</strong>
+                                {% if row.patient.patient_name %}
+                                    <div class="text-sm text-slate-500">{{ row.patient.patient_name }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.usernames %}
+                                    {% for username in row.usernames %}
+                                        <span class="pill">{{ username }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.groups %}
+                                    {% for group_name in row.groups %}
+                                        <span class="pill pill-group">{{ group_name }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.review_state == 'Reviewed' %}
+                                    <span class="pill pill-success">Reviewed</span>
+                                {% else %}
+                                    <span class="pill pill-warn">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.last_assigned %}
+                                    {{ row.last_assigned|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.first_assigned %}
+                                    {{ row.first_assigned|timesince }} ago
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline btn-xs assignment-unassign-btn"
+                                    data-patient-id="{{ row.patient.id }}"
+                                    data-group-id="{% if row.group_ids %}{{ row.group_ids.0 }}{% endif %}"
+                                    data-patient-label="{{ row.patient.patient_id }}"
+                                >
+                                    Remove
+                                </button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7">No assignments found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if assignment_page_obj %}
+            <div class="assignment-pagination">
+                {% if assignment_page_obj.has_previous %}
+                    <a class="page-link" href="{{ assignment_page_prefix }}page={{ assignment_page_obj.previous_page_number }}">Prev</a>
+                {% endif %}
+                <span class="page-status">Page {{ assignment_page_obj.number }} of {{ assignment_page_obj.paginator.num_pages }}</span>
+                {% if assignment_page_obj.has_next %}
+                    <a class="page-link" href="{{ assignment_page_prefix }}page={{ assignment_page_obj.next_page_number }}">Next</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </section>
+
+    <form id="deleteGroupForm" method="post" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_group">
+        <input type="hidden" name="group_id" id="delete_group_id">
+    </form>
+
+    <form id="inlineUnassignForm" method="post" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unassign">
+        <input type="hidden" name="patient_ids" id="inline_unassign_patient_id">
+        <input type="hidden" name="group_id" id="inline_unassign_group_id">
+    </form>
+
+    <form id="deactivateUserForm" method="post" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="deactivate_user">
+        <input type="hidden" name="user_id" id="deactivate_user_id">
+    </form>
+
+    <form id="inlineUnassignUserForm" method="post" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unassign">
+        <input type="hidden" name="patient_ids" id="inline_unassign_user_patient_id">
+    </form>
+
+    {% include 'assignments/_group_modal.html' %}
+
+    {{ patient_assignments_map|json_script:"patient-assignments-data" }}
+</div>
+{% endblock %}

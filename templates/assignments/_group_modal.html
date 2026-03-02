@@ -1,0 +1,45 @@
+<div id="groupModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+        <div class="modal-header">
+            <h3 id="groupModalTitle" class="modal-title">Create Assignment Group</h3>
+            <button type="button" id="closeGroupModal" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+
+        <form method="post" class="modal-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" id="modal_action" value="create_group">
+            <input type="hidden" name="group_id" id="modal_group_id" value="">
+
+            <div class="modal-body">
+                <div class="form-control">
+                    <label for="group_name">Group name</label>
+                    <input id="group_name" name="group_name" type="text" required>
+                </div>
+
+                <div class="form-control">
+                    <label for="group_description">Description</label>
+                    <textarea id="group_description" name="group_description" rows="3"></textarea>
+                </div>
+
+                <div class="form-control">
+                    <label for="group_user_search">Search users</label>
+                    <input id="group_user_search" type="text" placeholder="Filter users">
+                </div>
+
+                <div class="form-control">
+                    <label for="group_user_ids">Select users</label>
+                    <select id="group_user_ids" name="group_user_ids" multiple size="8">
+                        {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="cancelGroupModal" class="btn btn-secondary">Cancel</button>
+                <button type="submit" id="modal_submit_btn" class="btn btn-primary">Create Group</button>
+            </div>
+        </form>
+    </div>
+</div>

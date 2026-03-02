@@ -6,14 +6,13 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LoginView
 from django.contrib.auth.models import User
+from django.contrib.auth.views import LoginView
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
-from django.utils import timezone
 import pydicom
 import zipfile
 import shutil
@@ -39,8 +38,17 @@ from .services.admin_dashboard_service import (
     AdminDashboardActionService,
     AdminDashboardStatus,
     build_admin_dashboard_context,
+    build_admin_assignments_context,
+    build_admin_dashboard_chart_data,
 )
 from .services.feedback_service import FeedbackSubmissionService
+from .services.feedback_query_service import (
+    build_feedback_queryset,
+    build_querystring,
+    build_querystring_without_page,
+    paginate_feedback,
+    parse_feedback_list_params,
+)
 from .services.patient_context_service import build_patient_context, is_admin_user
 
 STATUS_MESSAGE_TIMEOUT_MS = 10000
@@ -149,6 +157,40 @@ def admin_dashboard(request):
 
 
 @login_required
+def admin_assignments(request):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+
+    status = AdminDashboardStatus()
+    if request.method == 'POST':
+        action_service = AdminDashboardActionService(request.user)
+        status = action_service.handle(request.POST)
+
+    context = build_admin_assignments_context(request.user, request.GET)
+    context.update({
+        'status_message': status.message,
+        'status_type': status.status_type,
+        'status_timeout_ms': STATUS_MESSAGE_TIMEOUT_MS,
+    })
+    return render(request, 'assignments/admin_assignments.html', context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def admin_dashboard_charts(request):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+
+    try:
+        range_days = int(request.GET.get("range") or 30)
+    except (TypeError, ValueError):
+        range_days = 30
+
+    payload = build_admin_dashboard_chart_data(range_days=range_days)
+    return JsonResponse(payload)
+
+
+@login_required
 def dicom_import(request):
     if not is_admin_user(request.user):
         return HttpResponseForbidden('Admin access required.')
@@ -241,6 +283,179 @@ def dicom_import(request):
     }
 
     return render(request, 'dicom_import.html', context)
+
+
+@login_required
+def admin_feedbacks(request):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+
+    params = parse_feedback_list_params(request.GET)
+    qs = build_feedback_queryset(scope="admin", user=request.user, params=params)
+    page_obj = paginate_feedback(qs, params=params)
+
+    base_qs = build_querystring_without_page(request.GET)
+    page_prefix = f"?{base_qs}&" if base_qs else "?"
+
+    return render(
+        request,
+        'admin_feedbacks.html',
+        {
+            'scope': 'admin',
+            'params': params,
+            'feedback_page_obj': page_obj,
+            'feedbacks': page_obj.object_list,
+            'page_prefix': page_prefix,
+            'base_querystring': base_qs,
+        },
+    )
+
+
+@login_required
+def my_feedbacks(request):
+    if is_admin_user(request.user):
+        return redirect('admin_feedbacks')
+
+    params = parse_feedback_list_params(request.GET)
+    qs = build_feedback_queryset(scope="user", user=request.user, params=params)
+    page_obj = paginate_feedback(qs, params=params)
+
+    base_qs = build_querystring_without_page(request.GET)
+    page_prefix = f"?{base_qs}&" if base_qs else "?"
+
+    return render(
+        request,
+        'my_feedbacks.html',
+        {
+            'scope': 'user',
+            'params': params,
+            'feedback_page_obj': page_obj,
+            'feedbacks': page_obj.object_list,
+            'page_prefix': page_prefix,
+            'base_querystring': base_qs,
+        },
+    )
+
+
+@login_required
+def export_feedbacks_csv(request):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+
+    import csv
+    from django.http import HttpResponse
+    from django.utils import timezone
+
+    params = parse_feedback_list_params(request.GET)
+    qs = build_feedback_queryset(scope="admin", user=request.user, params=params)
+
+    filename = f"roi_feedbacks_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            'id',
+            'username',
+            'patient_id',
+            'roi_label',
+            'rt1_label',
+            'rt1_rating',
+            'rt2_label',
+            'rt2_rating',
+            'comment',
+            'created_at',
+            'updated_at',
+        ]
+    )
+
+    for fb in qs.iterator(chunk_size=2000):
+        writer.writerow(
+            [
+                str(fb.id),
+                fb.user.username if fb.user else '',
+                fb.patient.patient_id if fb.patient else '',
+                fb.common_roi_label or '',
+                fb.rt1_label or '',
+                fb.rt1_rating if fb.rt1_rating is not None else '',
+                fb.rt2_label or '',
+                fb.rt2_rating if fb.rt2_rating is not None else '',
+                fb.comment or '',
+                fb.created_at.isoformat() if fb.created_at else '',
+                fb.updated_at.isoformat() if fb.updated_at else '',
+            ]
+        )
+
+    return response
+
+
+@login_required
+def export_feedbacks_xlsx(request):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+
+    from io import BytesIO
+    from django.http import HttpResponse
+    from django.utils import timezone
+
+    try:
+        from openpyxl import Workbook
+    except ImportError as exc:
+        raise ImportError(
+            "openpyxl is required for XLSX export. Install it with: pip install openpyxl"
+        ) from exc
+
+    params = parse_feedback_list_params(request.GET)
+    qs = build_feedback_queryset(scope="admin", user=request.user, params=params)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Feedbacks"
+
+    headers = [
+        'id',
+        'username',
+        'patient_id',
+        'roi_label',
+        'rt1_label',
+        'rt1_rating',
+        'rt2_label',
+        'rt2_rating',
+        'comment',
+        'created_at',
+        'updated_at',
+    ]
+    ws.append(headers)
+
+    for fb in qs.iterator(chunk_size=2000):
+        ws.append(
+            [
+                str(fb.id),
+                fb.user.username if fb.user else '',
+                fb.patient.patient_id if fb.patient else '',
+                fb.common_roi_label or '',
+                fb.rt1_label or '',
+                fb.rt1_rating if fb.rt1_rating is not None else '',
+                fb.rt2_label or '',
+                fb.rt2_rating if fb.rt2_rating is not None else '',
+                fb.comment or '',
+                fb.created_at.isoformat() if fb.created_at else '',
+                fb.updated_at.isoformat() if fb.updated_at else '',
+            ]
+        )
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = f"roi_feedbacks_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @login_required
