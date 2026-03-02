@@ -11,12 +11,12 @@
     <link rel="stylesheet" href="{% static 'rtstructcompare/css/dicom_web_viewer.css' %}">
     <link rel="stylesheet" href="{% static 'rtstructcompare/css/roi_ratings.css' %}">
     {% endblock %}
-    <link rel="stylesheet" href="{% static 'rtstructcompare/css/loading_spinner.css' %}">
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/utils/loading_spinner.css' %}">
 </head>
 
-<body class="bg-gray-100">
-    {% include "loading_spinner.html" %}
-    <div class="container mx-auto p-6">
+<body class="bg-gray-100 px-4 md:px-6 py-4 md:py-6">
+    {% include "utils/loading_spinner.html" %}
+    <div class="mx-auto w-full max-w-[90vw] p-6">
         <h1 class="text-3xl font-bold text-gray-800 mb-6">RTSTRUCT Comparison & Ratings</h1>
         <!-- Patient Info -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-6">
