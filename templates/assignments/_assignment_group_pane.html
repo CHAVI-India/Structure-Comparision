@@ -1,0 +1,92 @@
+<div id="groupAssignment" class="assignment-view is-active" aria-labelledby="groupBtn">
+    <div class="group-assignment-shell" style="border:0;background:transparent;box-shadow:none;padding:0;">
+        <form id="bulkGroupAssignmentForm" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_groups">
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;">
+                <section aria-label="Select groups" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:100%;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                        <div>
+                            <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Groups</h4>
+                            <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose the groups to receive patients.</p>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <button type="button" id="openGroupModalGroup" class="btn btn-xs" style="border-radius:999px;padding:6px 10px; border:1px solid #cbd5f5;">+ Create group</button>
+                            <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ assignment_groups|length }} total</span>
+                        </div>
+                    </div>
+                    <input type="text" id="bulk_group_search" class="bulk-filter" placeholder="Filter groups by name" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;width:100%;">
+                    <div id="bulkGroupList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+                        {% if assignment_groups %}
+                            {% for group in assignment_groups %}
+                                <label data-label="{{ group.name|lower }}" class="group-card" style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.05);">
+                                    <input type="checkbox" name="bulk_group_ids" value="{{ group.id }}" style="width:16px;height:16px;">
+                                    <div>
+                                        <div class="group-bulk-name" style="font-weight:600;color:#0f172a;">{{ group.name }}</div>
+                                        <div class="group-bulk-meta" style="font-size:0.8rem;color:#94a3b8;">{{ group.users.all|length }} users{% if group.description %} · {{ group.description|truncatechars:40 }}{% endif %}</div>
+                                    </div>
+                                    <div style="display:flex;align-items:center;gap:6px;">
+                                        <button type="button" class="btn btn-outline btn-xs edit-group" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" data-group-description="{{ group.description|default:'' }}" data-group-users="{% for u in group.users.all %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}" style="padding:6px 10px;border-radius:999px;font-size:0.8rem;">Edit</button>
+                                        <button type="button" class="btn btn-outline btn-xs delete-group-btn" data-group-id="{{ group.id }}" data-group-name="{{ group.name }}" style="padding:6px 10px;color:#9f1239;border-radius:999px;font-size:0.8rem;">Delete</button>
+                                    </div>
+                                </label>
+                            {% endfor %}
+                        {% else %}
+                            <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No groups available.</div>
+                        {% endif %}
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                        
+                        <div style="font-size:0.8rem;color:#64748b;">Tip: select multiple groups to bulk-assign patients.</div>
+                    </div>
+                </section>
+
+                <section aria-label="Select patients" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:100%;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                        <div>
+                            <h4 style="margin:0;font-weight:700;color:#0f172a;font-size:1.1rem;">Select Patients</h4>
+                            <p style="margin:4px 0 0;color:#64748b;font-size:0.85rem;">Choose one or more patients to assign.</p>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <button type="button" id="selectAssignedPatientsGroup" class="btn btn-outline btn-xs" style="padding:6px 10px;border-radius:999px;font-size:0.8rem;">Select assigned</button>
+                            <span class="badge" style="background:#badbfa;color:#125b9f;border-radius:999px;padding:4px 10px;font-size:0.8rem;font-weight:600;">{{ patients|length }} total</span>
+                        </div>
+                    </div>
+                    <input type="text" id="bulk_patient_search" class="bulk-filter" placeholder="Filter patients by ID or name" style="border:1px solid #cbd5f5;border-radius:14px;padding:10px 14px;font-size:0.9rem;width:100%;">
+                    <div id="bulkPatientList" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+                        {% if patients %}
+                            {% for patient in patients %}
+                                <label data-label="{{ patient.patient_id|lower }} {{ patient.patient_name|default:''|lower }}" data-patient-id="{{ patient.id }}" class="patient-card" style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;border:1px solid #e2e8f0;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,0.05);">
+                                    <input type="checkbox" name="bulk_patient_ids" value="{{ patient.id }}" style="width:16px;height:16px;">
+                                    <div>
+                                        <div class="group-bulk-name" style="font-weight:600;color:#0f172a;">{{ patient.patient_id }}</div>
+                                        <div class="group-bulk-meta" style="font-size:0.8rem;color:#94a3b8;">{{ patient.patient_name|default:'Anonymous Patient' }}</div>
+                                    </div>
+                                    <button type="button" class="btn btn-outline btn-xs unassign-patient-btn" data-patient-id="{{ patient.id }}" style="padding:6px 10px;border-radius:999px;font-size:0.8rem;">Unassign</button>
+                                </label>
+                            {% endfor %}
+                        {% else %}
+                            <div style="text-align:center;color:#94a3b8;padding:16px;border:1px dashed #cbd5f5;border-radius:12px;">No patients available.</div>
+                        {% endif %}
+                    </div>
+                </section>
+            </div>
+
+            <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
+                <button type="button" id="bulkAssignGroupBtn" class="btn btn-primary" style="border-radius:999px;padding:10px 16px;" disabled>Assign selected</button>
+                <button type="button" id="bulkUnassignGroupBtn" class="btn btn-danger" style="border-radius:999px;padding:10px 16px;" disabled>Unassign selected</button>
+            </div>
+
+            <style>
+                #bulkAssignGroupBtn:disabled,
+                #bulkUnassignGroupBtn:disabled {
+                    opacity: 0.55;
+                    filter: blur(0.35px) grayscale(0.25);
+                    cursor: not-allowed;
+                    box-shadow: none;
+                }
+            </style>
+        </form>
+    </div>
+</div>

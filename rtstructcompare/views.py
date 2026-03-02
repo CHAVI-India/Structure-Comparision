@@ -172,7 +172,7 @@ def admin_assignments(request):
         'status_type': status.status_type,
         'status_timeout_ms': STATUS_MESSAGE_TIMEOUT_MS,
     })
-    return render(request, 'admin_assignments.html', context)
+    return render(request, 'assignments/admin_assignments.html', context)
 
 
 @login_required

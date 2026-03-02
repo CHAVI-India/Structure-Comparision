@@ -1,0 +1,29 @@
+<div id="appConfirmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" aria-hidden="true">
+    <div class="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+        <div class="p-5">
+            <div class="flex items-start gap-4">
+                <div class="mt-1 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 ring-1 ring-rose-100">
+                    <svg class="h-5 w-5 text-rose-600" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 9v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h3 id="appConfirmTitle" class="text-base font-semibold text-slate-900">Confirm</h3>
+                    <p id="appConfirmMessage" class="mt-1 text-sm leading-6 text-slate-600"></p>
+                </div>
+                <button id="appConfirmCancel" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 p-4">
+            <button type="button" class="js-app-confirm-cancel px-4 py-2 rounded-lg bg-white text-slate-800 text-sm font-semibold ring-1 ring-slate-200 hover:bg-slate-50">Cancel</button>
+            <button id="appConfirmOk" type="button" class="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700">Confirm</button>
+        </div>
+    </div>
+</div>
