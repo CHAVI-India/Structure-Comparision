@@ -1,67 +1,153 @@
 {% extends 'base.html' %}
-
-{% block title %}My Patients - Structure Comparison{% endblock %}
+{% load static %}
+{% block title %}User Dashboard - Structure Comparison{% endblock %}
 
 {% block extra_css %}
-{% load static %}
-<link rel="stylesheet" href="{% static 'rtstructcompare/css/user_dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'rtstructcompare/css/admin_dashboard.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'rtstructcompare/js/user_dashboard.js' %}"></script>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-shell">
+<div class="admin-shell">
     <section class="hero">
-        <h1>My Assigned Patients</h1>
-        <p>Review and compare the RT structures for the patients assigned to your account.</p>
-        <div class="stats">
-            <div class="stat">
+        <h1>My Control Center</h1>
+        <p>Track your assignments, review status, and submit feedback for your patients.</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
                 <div class="label">Assigned Patients</div>
-                <div class="value">{{ assigned_patients_count }}</div>
-                <div class="meta">Active review workload</div>
+                <div class="value">{{ assigned_patients_count|default:"0" }}</div>
+                <p class="stat-subtext">Total patients assigned to you</p>
             </div>
-            <div class="stat">
-                <div class="label">Feedback Entries</div>
-                <div class="value">{{ feedback_done_count }}</div>
-                <div class="meta">ROI-level submissions</div>
+            <div class="stat-card">
+                <div class="label">Reviewed Patients</div>
+                <div class="value">{{ reviewed_patients_count|default:"0" }}</div>
+                <p class="stat-subtext">Patients with at least one feedback</p>
             </div>
-            <div class="stat">
+            <div class="stat-card">
                 <div class="label">Pending Reviews</div>
-                <div class="value">{{ pending_feedback_count }}</div>
-                <div class="meta">Patients awaiting feedback</div>
+                <div class="value">{{ pending_feedback_count|default:"0" }}</div>
+                <p class="stat-subtext">Patients awaiting your feedback</p>
             </div>
-            <div class="stat">
-                <div class="label">Completion Rate</div>
-                <div class="value">{{ completion_rate }}%</div>
-                <div class="meta">{{ reviewed_patients_count }} of {{ assigned_patients_count }} patients</div>
-            </div>
-            <div class="stat">
-                <div class="label">Latest Feedback</div>
-                {% if last_feedback %}
-                    <div class="value">{{ last_feedback.updated_at|date:"M d" }}</div>
-                    <div class="meta">
-                        {{ last_feedback.patient.patient_id }}
-                        {% if last_feedback.roi %} · {{ last_feedback.roi.roi_label }}{% endif %}
-                    </div>
-                {% else %}
-                    <div class="value">—</div>
-                    <div class="meta">No feedback yet</div>
-                {% endif %}
+            <div class="stat-card">
+                <div class="label">Feedback Entries</div>
+                <div class="value">{{ feedback_done_count|default:"0" }}</div>
+                <p class="stat-subtext">ROI-level submissions</p>
             </div>
         </div>
-        <form class="search-bar" method="get">
-            <input type="text" name="search" placeholder="Search by patient ID or name" value="{{ search_query }}">
-            <button type="submit">Search</button>
-        </form>
+    </section>
+
+    <section class="panel chart-panel">
+        <div class="section-header">
+            <h2>Trends</h2>
+            <div class="text-sm text-slate-500">Last <span id="chart-range-label">30</span> days</div>
+        </div>
+        <div class="chart-grid">
+            <div class="chart-card">
+                <h3>Assignments</h3>
+                <div class="chart-canvas-wrap"><canvas id="assignmentsChart" height="120"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h3>Feedback updates</h3>
+                <div class="chart-canvas-wrap"><canvas id="feedbackChart" height="120"></canvas></div>
+            </div>
+            <div class="chart-card chart-card--donut">
+                <h3>Reviewed vs Pending</h3>
+                <div class="chart-canvas-wrap"><canvas id="reviewDonut" height="160"></canvas></div>
+            </div>
+        </div>
+    </section>
+
+    <div class="dashboard-grid">
+        <div class="dashboard-aside">
+            <article class="panel panel-aside insight-card">
+                <header>
+                    <h3>Progress Snapshot</h3>
+                    <span class="badge">{{ completion_rate|default:"0" }}%</span>
+                </header>
+                <ul>
+                    <li><strong>{{ reviewed_patients_count|default:"0" }}</strong> patients reviewed</li>
+                    <li><strong>{{ pending_feedback_count|default:"0" }}</strong> patients pending</li>
+                    <li><strong>{{ assigned_patients_count|default:"0" }}</strong> total assignments</li>
+                </ul>
+            </article>
+
+            <article class="panel panel-aside insight-card">
+                <header>
+                    <h3>Latest Feedback</h3>
+                    <span class="badge">recent</span>
+                </header>
+                {% if last_feedback %}
+                <ul>
+                    <li>
+                        <strong>{{ last_feedback.patient.patient_id }}</strong>
+                        <div class="text-sm text-slate-600">{{ last_feedback.updated_at|date:"M d, Y H:i" }}</div>
+                        <div class="text-sm text-slate-600">
+                            {% if last_feedback.roi %}{{ last_feedback.roi.roi_label }}{% else %}{{ last_feedback.common_roi_label|default:"—" }}{% endif %}
+                        </div>
+                    </li>
+                </ul>
+                {% else %}
+                <div class="text-sm text-slate-500">No feedback submitted yet.</div>
+                {% endif %}
+            </article>
+        </div>
+    </div>
+
+    <section class="panel panel-main">
+        <div class="section-header">
+            <h2>My Assigned Patients</h2>
+            <a class="alert-row alert-info text-sm" href="{% url 'patients' %}">Open Patients Page</a>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>Name</th>
+                        <th>Gender</th>
+                        <th>DOB</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for patient_data in patients|slice:":8" %}
+                    <tr>
+                        <td><strong>{{ patient_data.patient.patient_id }}</strong></td>
+                        <td>{{ patient_data.patient.patient_name|default:"—" }}</td>
+                        <td>{{ patient_data.patient.patient_gender|default:"—" }}</td>
+                        <td>
+                            {% if patient_data.patient.patient_date_of_birth %}
+                            {{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}
+                            {% else %}
+                            <span class="text-sm text-slate-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="pill" href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}">View Comparison</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">No assigned patients yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <section class="panel">
         <div class="section-header">
-            <div>
-                <h2>My Feedbacks</h2>
-                <p class="text-sm">Recent ROI feedback submissions for your assigned patients.</p>
-            </div>
+            <h2>Recent Feedback</h2>
+            <a class="alert-row alert-info text-sm" href="{% url 'my_feedbacks' %}">View All My Feedbacks</a>
         </div>
         <div class="table-wrap">
-            <table class="feedback-table">
+            <table>
                 <thead>
                     <tr>
                         <th>Patient</th>
@@ -76,67 +162,24 @@
                 </thead>
                 <tbody>
                     {% for feedback in recent_feedbacks %}
-                        <tr>
-                            <td>{{ feedback.patient.patient_id }}</td>
-                            <td>
-                                {% if feedback.roi %}
-                                    {{ feedback.roi.roi_label }}
-                                {% else %}
-                                    {{ feedback.common_roi_label|default:"—" }}
-                                {% endif %}
-                            </td>
-                            <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
-                            <td>{{ feedback.rt1_rating|default:"—" }}</td>
-                            <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
-                            <td>{{ feedback.rt2_rating|default:"—" }}</td>
-                            <td>{{ feedback.comment|default:"—"|truncatechars:60 }}</td>
-                            <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
-                        </tr>
+                    <tr>
+                        <td>{{ feedback.patient.patient_id }}</td>
+                        <td>{% if feedback.roi %}{{ feedback.roi.roi_label }}{% else %}{{ feedback.common_roi_label|default:"—" }}{% endif %}</td>
+                        <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
+                        <td>{{ feedback.rt1_rating|default:"—" }}</td>
+                        <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
+                        <td>{{ feedback.rt2_rating|default:"—" }}</td>
+                        <td>{{ feedback.comment|default:"—"|truncatechars:60 }}</td>
+                        <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                    </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="8" class="text-slate-500">No feedback submitted yet.</td>
-                        </tr>
+                    <tr>
+                        <td colspan="8">No feedback submitted yet.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </section>
-
-    {% if patients %}
-        <section class="patient-grid">
-            {% for patient_data in patients %}
-                <article class="patient-card">
-                    <div>
-                        <div class="patient-id truncate">{{ patient_data.patient.patient_id }}</div>
-                        <div class="patient-meta">
-                            {% if patient_data.patient.patient_name %}
-                                <div><span>Name:</span> {{ patient_data.patient.patient_name }}</div>
-                            {% endif %}
-                            {% if patient_data.patient.patient_gender %}
-                                <div><span>Gender:</span> {{ patient_data.patient.patient_gender }}</div>
-                            {% endif %}
-                            {% if patient_data.patient.patient_date_of_birth %}
-                                <div><span>DOB:</span> {{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="counts">
-                        <span class="count-pill">Studies: {{ patient_data.total_studies }}</span>
-                        <span class="count-pill">Series: {{ patient_data.total_series }}</span>
-                    </div>
-                    <div class="cta">
-                        <a href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}">
-                            View Comparison
-                        </a>
-                    </div>
-                </article>
-            {% endfor %}
-        </section>
-    {% else %}
-        <div class="empty-state">
-            <h3 class="text-xl font-semibold text-slate-800">No assigned patients yet</h3>
-            <p>Ask an admin to assign patients to your account.</p>
-        </div>
-    {% endif %}
 </div>
 {% endblock %}
