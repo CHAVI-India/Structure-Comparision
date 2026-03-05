@@ -9,13 +9,42 @@ let selectedROIs = new Set();
 let isSyncingROIs = false;
 let currentWindow = 2000;
 let currentLevel = 1000;
-let zoomLevel1 = 1.4;
-let zoomLevel2 = 1.4;
+let zoomLevel1 = 1;
+let zoomLevel2 = 1;
 let panOffset1 = { x: 0, y: 0 };
 let panOffset2 = { x: 0, y: 0 };
 
 let _tempCanvas = null;
 let _tempCtx = null;
+
+function syncCanvasSize(canvas) {
+    if (!canvas) return false;
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = Math.max(1, Math.floor(canvas.offsetWidth));
+    const displayHeight = Math.max(1, Math.floor(canvas.offsetHeight));
+    const neededWidth = Math.floor(displayWidth * dpr);
+    const neededHeight = Math.floor(displayHeight * dpr);
+    if (canvas.width !== neededWidth || canvas.height !== neededHeight) {
+        canvas.width = neededWidth;
+        canvas.height = neededHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        return true;
+    }
+    return false;
+}
+
+function getCoverTransform(canvasWidth, canvasHeight, sliceWidth, sliceHeight, zoomLevel, panOffset) {
+    const baseScale = Math.max(canvasWidth / sliceWidth, canvasHeight / sliceHeight);
+    const scale = baseScale * zoomLevel;
+    const scaledWidth = sliceWidth * scale;
+    const scaledHeight = sliceHeight * scale;
+    const x = (canvasWidth - scaledWidth) / 2 + panOffset.x;
+    const y = (canvasHeight - scaledHeight) / 2 + panOffset.y;
+    return { scale, scaledWidth, scaledHeight, x, y };
+}
 
 const windowLevelPresets = {
     pan: { window: 400, level: 0 },
@@ -39,10 +68,8 @@ function initializeViewer() {
 
     if (!canvas1 || !canvas2) return;
 
-    canvas1.width = canvas1.offsetWidth;
-    canvas1.height = canvas1.offsetHeight;
-    canvas2.width = canvas2.offsetWidth;
-    canvas2.height = canvas2.offsetHeight;
+    syncCanvasSize(canvas1);
+    syncCanvasSize(canvas2);
 
     const totalSlicesEl = document.getElementById('totalSlices');
     if (totalSlicesEl) totalSlicesEl.textContent = ctData.length;
@@ -89,6 +116,14 @@ function initializeViewer() {
     displaySlice();
     setupMouseHandlers();
     updateZoomDisplays();
+
+    window.addEventListener('resize', () => {
+        const changed1 = syncCanvasSize(canvas1);
+        const changed2 = syncCanvasSize(canvas2);
+        if (changed1 || changed2) {
+            displaySlice();
+        }
+    });
 }
 
 function displaySlice() {
@@ -98,10 +133,27 @@ function displaySlice() {
     const ctx1 = canvas1.getContext('2d');
     const ctx2 = canvas2.getContext('2d');
 
+    syncCanvasSize(canvas1);
+    syncCanvasSize(canvas2);
+
+    const canvas1CssWidth = Math.max(1, Math.floor(canvas1.offsetWidth));
+    const canvas1CssHeight = Math.max(1, Math.floor(canvas1.offsetHeight));
+    const canvas2CssWidth = Math.max(1, Math.floor(canvas2.offsetWidth));
+    const canvas2CssHeight = Math.max(1, Math.floor(canvas2.offsetHeight));
+
+    ctx1.save();
+    ctx1.setTransform(1, 0, 0, 1, 0, 0);
+    ctx1.clearRect(0, 0, canvas1.width, canvas1.height);
     ctx1.fillStyle = '#000';
     ctx1.fillRect(0, 0, canvas1.width, canvas1.height);
+    ctx1.restore();
+
+    ctx2.save();
+    ctx2.setTransform(1, 0, 0, 1, 0, 0);
+    ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
     ctx2.fillStyle = '#000';
     ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+    ctx2.restore();
 
     if (!ctData.length) return;
 
@@ -110,11 +162,11 @@ function displaySlice() {
     const sliceSlider = document.getElementById('sliceSlider');
     if (sliceSlider) sliceSlider.value = currentSliceIndex;
     updateSliceInfo();
-    displayCTSlice(ctx1, canvas1.width, canvas1.height, ctData[currentSliceIndex], zoomLevel1, panOffset1);
-    displayCTSlice(ctx2, canvas2.width, canvas2.height, ctData[currentSliceIndex], zoomLevel2, panOffset2);
+    displayCTSlice(ctx1, canvas1CssWidth, canvas1CssHeight, ctData[currentSliceIndex], zoomLevel1, panOffset1);
+    displayCTSlice(ctx2, canvas2CssWidth, canvas2CssHeight, ctData[currentSliceIndex], zoomLevel2, panOffset2);
 
-    drawROIOverlays(ctx1, canvas1.width, canvas1.height, rt1Contours, ctData[currentSliceIndex], zoomLevel1, panOffset1);
-    drawROIOverlays(ctx2, canvas2.width, canvas2.height, rt2Contours, ctData[currentSliceIndex], zoomLevel2, panOffset2);
+    drawROIOverlays(ctx1, canvas1CssWidth, canvas1CssHeight, rt1Contours, ctData[currentSliceIndex], zoomLevel1, panOffset1);
+    drawROIOverlays(ctx2, canvas2CssWidth, canvas2CssHeight, rt2Contours, ctData[currentSliceIndex], zoomLevel2, panOffset2);
 
     updateZoomDisplays();
 }
@@ -193,12 +245,8 @@ function displayCTSlice(ctx, canvasWidth, canvasHeight, slice, zoomLevel = 1.0, 
     if (_tempCanvas.height !== slice.height) _tempCanvas.height = slice.height;
     _tempCtx.putImageData(imageData, 0, 0);
 
-    const scaledWidth = slice.width * zoomLevel;
-    const scaledHeight = slice.height * zoomLevel;
-    const x = (canvasWidth - scaledWidth) / 2 + panOffset.x;
-    const y = (canvasHeight - scaledHeight) / 2 + panOffset.y;
-
-    ctx.drawImage(_tempCanvas, 0, 0, slice.width, slice.height, x, y, scaledWidth, scaledHeight);
+    const t = getCoverTransform(canvasWidth, canvasHeight, slice.width, slice.height, zoomLevel, panOffset);
+    ctx.drawImage(_tempCanvas, 0, 0, slice.width, slice.height, t.x, t.y, t.scaledWidth, t.scaledHeight);
 }
 
 function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, currentSlice, zoomLevel = 1.0, panOffset = { x: 0, y: 0 }) {
@@ -209,10 +257,17 @@ function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, curre
     const pixelSpacing = currentSlice.pixel_spacing || [1.0, 1.0];
     const imagePosition = currentSlice.image_position || [0, 0, 0];
 
-    const scaledWidth = currentSlice.width * zoomLevel;
-    const scaledHeight = currentSlice.height * zoomLevel;
-    const baseX = (canvasWidth - scaledWidth) / 2 + panOffset.x;
-    const baseY = (canvasHeight - scaledHeight) / 2 + panOffset.y;
+    const t = getCoverTransform(
+        canvasWidth,
+        canvasHeight,
+        currentSlice.width,
+        currentSlice.height,
+        zoomLevel,
+        panOffset,
+    );
+    const baseX = t.x;
+    const baseY = t.y;
+    const scale = t.scale;
 
     selectedROIsArray.forEach((roiName, roiIndex) => {
         const roiContourData = rtstructContours[roiName];
@@ -262,10 +317,9 @@ function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, curre
                 const pixelX = (x - imagePosition[0]) / pixelSpacing[0];
                 const pixelY = (y - imagePosition[1]) / pixelSpacing[1];
 
-                const canvasX = baseX + pixelX * zoomLevel;
-                const canvasY = baseY + pixelY * zoomLevel;
-
-                return [canvasX, canvasY];
+                const screenX = baseX + (pixelX * scale);
+                const screenY = baseY + (pixelY * scale);
+                return [screenX, screenY];
             });
 
             const validPoints = points2D.filter((point) =>
@@ -335,9 +389,9 @@ document.addEventListener('keydown', (e) => {
 
 function updateZoomLevel(viewer, newLevel) {
     if (viewer === 1) {
-        zoomLevel1 = Math.max(0.1, Math.min(5.0, newLevel));
+        zoomLevel1 = Math.max(0.5, Math.min(5.0, newLevel));
     } else {
-        zoomLevel2 = Math.max(0.1, Math.min(5.0, newLevel));
+        zoomLevel2 = Math.max(0.5, Math.min(5.0, newLevel));
     }
     displaySlice();
 }
@@ -352,10 +406,10 @@ function zoomOut(viewer) {
 
 function resetZoom(viewer) {
     if (viewer === 1) {
-        zoomLevel1 = 1.4;
+        zoomLevel1 = 1;
         panOffset1 = { x: 0, y: 0 };
     } else {
-        zoomLevel2 = 1.4;
+        zoomLevel2 = 1;
         panOffset2 = { x: 0, y: 0 };
     }
     displaySlice();
@@ -368,8 +422,8 @@ function zoomBoth(direction) {
 }
 
 function resetBothZoom() {
-    zoomLevel1 = 1.4;
-    zoomLevel2 = 1.4;
+    zoomLevel1 = 1;
+    zoomLevel2 = 1;
     panOffset1 = { x: 0, y: 0 };
     panOffset2 = { x: 0, y: 0 };
     displaySlice();

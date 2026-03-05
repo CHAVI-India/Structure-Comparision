@@ -13,7 +13,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
-import pydicom
+from django.db.models import Q, Count
+from django.db.models.functions import TruncDate
+from django.utils import timezone
+from datetime import timedelta
 import zipfile
 import shutil
 from uuid import uuid4
@@ -26,7 +29,6 @@ from .models import (
     RTStruct,
     Roi,
     PatientAssignment,
-    AssignmentGroup,
     GroupPatientAssignment,
 )
 import json
@@ -188,6 +190,108 @@ def admin_dashboard_charts(request):
 
     payload = build_admin_dashboard_chart_data(range_days=range_days)
     return JsonResponse(payload)
+
+
+@login_required
+@require_http_methods(["GET"])
+def user_dashboard_charts(request):
+    if is_admin_user(request.user):
+        return HttpResponseForbidden('User access required.')
+
+    try:
+        range_days = int(request.GET.get("range") or 30)
+    except (TypeError, ValueError):
+        range_days = 30
+
+    safe_range = max(7, min(int(range_days or 30), 90))
+    start_dt = timezone.now() - timedelta(days=safe_range - 1)
+    start_date = start_dt.date()
+
+    labels = [(start_date + timedelta(days=i)).isoformat() for i in range(safe_range)]
+    assignment_index = {label: 0 for label in labels}
+    feedback_index = {label: 0 for label in labels}
+
+    # Assigned patients for this user (direct + group)
+    assigned_patients_qs = Patient.objects.filter(
+        Q(assignments__user=request.user)
+        | Q(group_assignments__group__users=request.user)
+    ).distinct()
+
+    # Assignments by day (direct + group assignments)
+    assignment_counts = (
+        PatientAssignment.objects.filter(
+            user=request.user,
+            assigned_at__date__gte=start_date,
+        )
+        .annotate(day=TruncDate("assigned_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+    )
+    for row in assignment_counts:
+        day = row.get("day")
+        if day:
+            key = day.isoformat()
+            if key in assignment_index:
+                assignment_index[key] += int(row.get("count") or 0)
+
+    group_assignment_counts = (
+        GroupPatientAssignment.objects.filter(
+            group__users=request.user,
+            assigned_at__date__gte=start_date,
+        )
+        .annotate(day=TruncDate("assigned_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+    )
+    for row in group_assignment_counts:
+        day = row.get("day")
+        if day:
+            key = day.isoformat()
+            if key in assignment_index:
+                assignment_index[key] += int(row.get("count") or 0)
+
+    # Feedback updates by day (only this user's feedback on assigned patients)
+    feedback_counts = (
+        Feedback.objects.filter(
+            user=request.user,
+            patient__in=assigned_patients_qs,
+            updated_at__date__gte=start_date,
+        )
+        .annotate(day=TruncDate("updated_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+    )
+    for row in feedback_counts:
+        day = row.get("day")
+        if day:
+            key = day.isoformat()
+            if key in feedback_index:
+                feedback_index[key] += int(row.get("count") or 0)
+
+    assignments_by_day = [assignment_index[d] for d in labels]
+    feedback_by_day = [feedback_index[d] for d in labels]
+
+    assigned_patients_count = assigned_patients_qs.count()
+    reviewed_patients_count = (
+        Feedback.objects.filter(user=request.user, patient__in=assigned_patients_qs)
+        .values("patient_id")
+        .distinct()
+        .count()
+    )
+    pending_count = max(assigned_patients_count - reviewed_patients_count, 0)
+
+    return JsonResponse(
+        {
+            "range_days": safe_range,
+            "labels": labels,
+            "assignments_by_day": assignments_by_day,
+            "feedback_by_day": feedback_by_day,
+            "review_breakdown": {
+                "reviewed": reviewed_patients_count,
+                "pending": pending_count,
+            },
+        }
+    )
 
 
 @login_required

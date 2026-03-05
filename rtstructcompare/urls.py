@@ -22,6 +22,7 @@ urlpatterns = [
     path('import/', views.dicom_import, name='dicom_import'),
 
     path('user/dashboard/', views.user_dashboard, name='user_dashboard'),
+    path('user/dashboard/charts/', views.user_dashboard_charts, name='user_dashboard_charts'),
     path('user/feedbacks/', views.my_feedbacks, name='my_feedbacks'),
 
     path('', views.home, name='home'),

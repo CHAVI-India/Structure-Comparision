@@ -24,8 +24,8 @@
                         <a href="{% url 'admin:index' %}" class="hover:text-teal-100">Admin Panel</a>
                     {% else %}
                         <a href="{% url 'user_dashboard' %}" class="hover:text-teal-100">Dashboard</a>
-                        <a href="{% url 'patients' %}" class="hover:text-teal-100">Assigned Patients</a>
-                        <a href="{% url 'my_feedbacks' %}" class="hover:text-teal-100">My Feedback</a>
+                        <a href="{% url 'patients' %}" class="hover:text-teal-100">Patients</a>
+                        <a href="{% url 'my_feedbacks' %}" class="hover:text-teal-100">Feedback</a>
                     {% endif %}
                     <form method="post" action="{% url 'logout' %}" class="inline-flex">
                         {% csrf_token %}
@@ -45,7 +45,7 @@
         {% endblock %}
     </main>
 
-    {% include 'confirm_modal.html' %}
+    {% include 'utils/confirm_modal.html' %}
 
     {% block extra_js %}
     {% endblock %}

@@ -5,6 +5,7 @@
 {% block extra_css %}
     {% load static %}
     <link rel="stylesheet" href="{% static 'rtstructcompare/css/patients.css' %}">
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/utils/pagination.css' %}">
 {% endblock %}
 
 {% block extra_js %}
@@ -175,37 +176,12 @@
             </div>
             {% endfor %}
             </div>
-            {% if is_paginated %}
-            <div class="pagination" style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem; margin-top: 2rem;">
-                <span class="page-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-                <div class="page-links" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
-                    {% if page_obj.has_previous %}
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if pagination_querystring %}&{{ pagination_querystring }}{% endif %}">Previous</a>
-                    {% else %}
-                        <span class="page-link disabled" style="opacity: 0.5; cursor: not-allowed;">Previous</span>
-                    {% endif %}
-
-                    {% for num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == num %}
-                            <span class="page-link active">{{ num }}</span>
-                        {% else %}
-                            <a class="page-link" href="?page={{ num }}{% if pagination_querystring %}&{{ pagination_querystring }}{% endif %}">{{ num }}</a>
-                        {% endif %}
-                    {% endfor %}
-
-                    {% if page_obj.has_next %}
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if pagination_querystring %}&{{ pagination_querystring }}{% endif %}">Next</a>
-                    {% else %}
-                        <span class="page-link disabled" style="opacity: 0.5; cursor: not-allowed;">Next</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
+            {% include 'utils/_pagination.html' %}
             {% else %}
             <div class="empty-state">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 4.5rem; height: 4.5rem; margin: 0 auto 1.5rem; color: #94a3b8;">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0 2 2 0 014 0z">
                     </path>
                 </svg>
                 <h3 style="font-size: 1.5rem; font-weight: 600; color: #111827; margin-bottom: 0.5rem;">No Patients Found</h3>
