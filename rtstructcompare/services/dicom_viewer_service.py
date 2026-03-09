@@ -1,14 +1,21 @@
 import json
+from io import BytesIO
 from pathlib import Path
 import pydicom
+import boto3
+from django.conf import settings
+from botocore.exceptions import BotoCoreError, ClientError
 
 from ..models import (
     DICOMStudy,
     DICOMSeries,
+    DICOMInstance,
     RTStruct,
     Roi,
     Feedback,
 )
+
+_s3_client = None
 
 
 class DicomViewerError(Exception):
@@ -125,46 +132,87 @@ def build_viewer_context(patient, *, user=None):
 
 
 def _load_dicom_files_from_database(patient):
-    ct_file_paths = []
-    rtstruct_file_paths = []
-    processed_dirs = set()
+    ct_file_refs = []
+    rtstruct_file_refs = []
 
-    studies = DICOMStudy.objects.filter(patient=patient)
-    for study in studies:
-        series_list = DICOMSeries.objects.filter(study=study)
-        for series in series_list:
-            if series.series_root_path and Path(series.series_root_path).exists():
-                series_path = Path(series.series_root_path)
-                series_path_str = str(series_path)
-                if series_path_str in processed_dirs:
-                    continue
-                processed_dirs.add(series_path_str)
+    instances = (
+        DICOMInstance.objects
+        .select_related('series', 'series__study')
+        .filter(series__study__patient=patient)
+    )
 
-                dicom_files = list(series_path.glob('*.dcm'))
-                for dicom_file in dicom_files:
-                    try:
-                        ds = pydicom.dcmread(dicom_file, stop_before_pixels=True)
-                        modality = getattr(ds, 'Modality', None)
-                        if modality == 'CT':
-                            ct_file_paths.append(str(dicom_file))
-                        elif modality == 'RTSTRUCT':
-                            rtstruct_file_paths.append(str(dicom_file))
-                    except Exception:
-                        continue
+    for instance in instances:
+        modality = (instance.series.modality or '').upper()
+        path = instance.instance_path
+        if not path:
+            continue
+        if modality == 'CT':
+            ct_file_refs.append(path)
+        elif modality == 'RTSTRUCT':
+            rtstruct_file_refs.append(path)
 
-    return ct_file_paths, rtstruct_file_paths
+    return ct_file_refs, rtstruct_file_refs
 
 
 def _load_dicom_files_from_paths(file_paths):
     dicom_files = []
     for file_path in file_paths:
         try:
-            if Path(file_path).exists():
-                ds = pydicom.dcmread(file_path)
-                dicom_files.append(ds)
+            dataset = _read_dicom_dataset(file_path)
+            if dataset:
+                dicom_files.append(dataset)
         except Exception:
             continue
     return dicom_files
+
+
+def _read_dicom_dataset(file_reference):
+    if not file_reference:
+        return None
+
+    if str(file_reference).startswith('s3://'):
+        bucket, key = _parse_s3_uri(file_reference)
+        client = _get_s3_client()
+        try:
+            obj = client.get_object(Bucket=bucket, Key=key)
+            body = obj['Body'].read()
+            return pydicom.dcmread(BytesIO(body))
+        except (ClientError, BotoCoreError):
+            return None
+    else:
+        path = Path(file_reference)
+        if path.exists():
+            return pydicom.dcmread(path)
+    return None
+
+
+def _parse_s3_uri(uri: str):
+    without_scheme = uri[5:]
+    if '/' not in without_scheme:
+        raise ValueError(f'Invalid S3 URI: {uri}')
+    bucket, key = without_scheme.split('/', 1)
+    return bucket, key
+
+
+def _get_s3_client():
+    global _s3_client
+    if _s3_client is None:
+        client_kwargs = {}
+        access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', None)
+        secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', None)
+        region_name = getattr(settings, 'AWS_S3_REGION_NAME', None)
+        signature_version = getattr(settings, 'AWS_S3_SIGNATURE_VERSION', None)
+
+        if access_key and secret_key:
+            client_kwargs['aws_access_key_id'] = access_key
+            client_kwargs['aws_secret_access_key'] = secret_key
+        if region_name:
+            client_kwargs['region_name'] = region_name
+        if signature_version:
+            client_kwargs.setdefault('config', boto3.session.Config(signature_version=signature_version))
+
+        _s3_client = boto3.client('s3', **client_kwargs)
+    return _s3_client
 
 
 def _analyze_dicom_data(dicom_files):

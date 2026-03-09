@@ -1,6 +1,13 @@
+import logging
 import pydicom
+import tempfile
+import posixpath
+from uuid import uuid4
 from datetime import datetime
 from pathlib import Path
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F
 from ..models import (
@@ -13,8 +20,68 @@ from ..models import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 class DicomImportError(Exception):
     """Raised when the import process encounters a fatal error."""
+
+
+def _get_dicom_upload_prefix():
+    return getattr(settings, 'DICOM_S3_PREFIX', 'dicom_uploads')
+
+
+def _build_s3_storage_context(root_directory: Path):
+    bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+    access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', None)
+    secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', None)
+    region_name = getattr(settings, 'AWS_S3_REGION_NAME', None)
+    if not bucket:
+        raise DicomImportError('AWS_STORAGE_BUCKET_NAME is not configured for DICOM uploads.')
+    if not access_key or not secret_key:
+        raise DicomImportError('AWS credentials (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) are not configured.')
+
+    base_prefix = _get_dicom_upload_prefix()
+    return {
+        'type': 's3',
+        'bucket': bucket,
+        'client': boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region_name,
+        ),
+        'base_prefix': base_prefix,
+        'base_uri': f's3://{bucket}/{base_prefix}',
+        'root_directory': root_directory,
+    }
+
+
+def _store_file_reference(file_path: Path, root_directory: Path, storage_context, *, patient_identifier=None):
+    relative_path = file_path.relative_to(root_directory)
+
+    if storage_context and storage_context.get('type') == 's3':
+        patient_segment = patient_identifier or uuid4().hex
+        key = posixpath.join(
+            storage_context['base_prefix'],
+            patient_segment,
+            relative_path.as_posix(),
+        )
+        try:
+            storage_context['client'].upload_file(str(file_path), storage_context['bucket'], key)
+        except (BotoCoreError, ClientError) as exc:
+            raise DicomImportError(f'Failed to upload {relative_path} to S3: {exc}') from exc
+
+        file_uri = f"s3://{storage_context['bucket']}/{key}"
+
+        if relative_path.parent and relative_path.parent.as_posix() not in ('', '.'):
+            dir_key = posixpath.join(storage_context['base_prefix'], patient_segment, relative_path.parent.as_posix())
+        else:
+            dir_key = posixpath.join(storage_context['base_prefix'], patient_segment)
+        dir_uri = f"s3://{storage_context['bucket']}/{dir_key}"
+        return file_uri, dir_uri
+
+    return str(file_path), str(file_path.parent)
 
 
 def _get_dicom_tag(ds, tag_name, default=''):
@@ -62,7 +129,7 @@ def _find_dicom_files(root_directory: Path):
     return dicom_files
 
 
-def import_dicom_directory(root_directory, *, progress_callback=None):
+def import_dicom_directory(root_directory, *, progress_callback=None, storage_context=None):
     root_directory = Path(root_directory)
 
     dicom_files = _find_dicom_files(root_directory)
@@ -93,8 +160,15 @@ def import_dicom_directory(root_directory, *, progress_callback=None):
         try:
             with transaction.atomic():
                 ds = pydicom.dcmread(str(file_path))
-
                 patient_id = _get_dicom_tag(ds, 'PatientID', 'UNKNOWN')
+                patient_segment = patient_id or None
+                file_uri, dir_uri = _store_file_reference(
+                    file_path,
+                    root_directory,
+                    storage_context,
+                    patient_identifier=patient_segment,
+                )
+
                 if patient_id not in created_patients:
                     patient, created = Patient.objects.get_or_create(
                         patient_id=patient_id,
@@ -147,7 +221,7 @@ def import_dicom_directory(root_directory, *, progress_callback=None):
                         defaults={
                             'study': study,
                             'series_description': _get_dicom_tag(ds, 'SeriesDescription', ''),
-                            'series_root_path': str(file_path.parent),
+                            'series_root_path': dir_uri,
                             'frame_of_reference_uid': _get_dicom_tag(ds, 'FrameOfReferenceUID', ''),
                             'modality': modality,
                             'series_date': _parse_dicom_date(_get_dicom_tag(ds, 'SeriesDate', '')),
@@ -174,7 +248,7 @@ def import_dicom_directory(root_directory, *, progress_callback=None):
                         sop_instance_uid=sop_instance_uid,
                         defaults={
                             'series': series,
-                            'instance_path': str(file_path),
+                            'instance_path': file_uri,
                             'instance_number': _get_dicom_tag(ds, 'InstanceNumber', None),
                         },
                     )
@@ -220,8 +294,59 @@ def import_dicom_directory(root_directory, *, progress_callback=None):
                             if roi_created:
                                 stats['rois'] += 1
 
-        except Exception:
+        except Exception as exc:
             stats['errors'] += 1
+            logger.exception("Failed to ingest %s", file_path)
             continue
 
     return stats
+
+
+def _safe_relative_path(filename: str, fallback_index: int) -> Path:
+    """Return a safe, relative path derived from an uploaded filename."""
+    if not filename:
+        return Path(f"uploaded_{fallback_index}.dcm")
+
+    normalized = str(filename).replace("\\", "/")
+    parts = [part for part in normalized.split("/") if part not in ("", ".", "..")]
+    if not parts:
+        return Path(f"uploaded_{fallback_index}.dcm")
+    return Path(*parts)
+
+
+def import_dicom_file_objects(uploaded_files, *, progress_callback=None):
+    """Persist uploaded file objects, upload to S3 if configured, and import."""
+    if not uploaded_files:
+        raise DicomImportError('No files uploaded for import.')
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        storage_context = None
+
+        for index, uploaded_file in enumerate(uploaded_files, start=1):
+            relative_path = _safe_relative_path(getattr(uploaded_file, 'name', ''), index)
+            destination = temp_root / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+
+            with destination.open('wb') as dest_fp:
+                if hasattr(uploaded_file, 'chunks'):
+                    for chunk in uploaded_file.chunks():
+                        dest_fp.write(chunk)
+                else:
+                    dest_fp.write(uploaded_file.read())
+
+            if hasattr(uploaded_file, 'seek'):
+                uploaded_file.seek(0)
+
+        if getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None):
+            storage_context = _build_s3_storage_context(temp_root)
+
+        stats = import_dicom_directory(
+            temp_root,
+            progress_callback=progress_callback,
+            storage_context=storage_context,
+        )
+        stats['total_files'] = len(uploaded_files)
+        if storage_context:
+            stats['storage_location'] = storage_context.get('base_uri')
+        return stats
