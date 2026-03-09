@@ -76,9 +76,7 @@ class RoleBasedLoginView(LoginView):
         redirect_url = self.get_redirect_url()
         if redirect_url:
             return redirect_url
-        if is_admin_user(self.request.user):
-            return reverse('admin_dashboard')
-        return reverse('user_dashboard')
+        return reverse('patients')
 
 
 @login_required
