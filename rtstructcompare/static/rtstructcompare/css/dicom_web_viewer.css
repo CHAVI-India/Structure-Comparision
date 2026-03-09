@@ -1,7 +1,7 @@
 .viewer-container {
     display: flex;
     gap: .5rem;
-    height: 80vh;
+    height: 75vh;
 }
 
 .hs-select-disabled {
@@ -44,6 +44,8 @@
 .viewer-label {
     top: 0;
     left: 0;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 .viewer-zoom {

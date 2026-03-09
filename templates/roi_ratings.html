@@ -43,26 +43,16 @@
             <thead>
                 <tr class="border-b bg-gray-50">
                     <th scope="col" class="text-left py-2 px-2 font-semibold">ROI Name</th>
-                    <th scope="col" class="text-center py-2 px-2 font-semibold">
-                        <label class="inline-flex items-center gap-1 text-xs text-gray-500">
-                            <input type="checkbox" id="roiRatingSelectAll">
-                            <span class="opacity-600">Select ROIs</span>
-                        </label>
-                    </th>
                     <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_label|default:'RTSTRUCT 1'|truncatechars:30 }}</th>
                     <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_label|default:'RTSTRUCT 2'|truncatechars:30 }}</th>
                     <th scope="col" class="text-center py-2 px-2 font-semibold">Comment</th>
+                    <th scope="col" class="text-center py-2 px-2 font-semibold">Submit Rating</th>
                 </tr>
             </thead>
             <tbody>
                 {% for structure in common_structures %}
                 <tr class="border-b hover:bg-gray-50" data-roi-name="{{ structure }}">
                     <th scope="row" class="py-2 px-2 font-medium text-left">{{ structure }}</th>
-                    <td class="py-2 px-2 text-center">
-                        <label class="inline-flex items-center gap-1 text-xs text-gray-600">
-                            <input type="checkbox" class="roi-rating-include">
-                        </label>
-                    </td>
                     <td class="p-2 text-center">
                         <div class="rating-control">
                             <div class="flex justify-center gap-4">
@@ -112,16 +102,23 @@
                             💬
                         </button>
                     </td>
+                    <td class="py-2 px-2 text-center">
+                        <div class="flex flex-col items-center gap-1">
+                            <button type="button"
+                                class="roi-submit-btn px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
+                                data-roi-name="{{ structure }}"
+                                aria-label="Submit rating for {{ structure }}">
+                                Submit
+                            </button>
+                            <span class="roi-submit-status text-xs text-gray-500" data-roi-name="{{ structure }}"></span>
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <div class="px-3 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full bg-gray-50 border-t border-gray-200">
+        <div class="px-3 py-3 bg-gray-50 border-t border-gray-200">
             <span id="submitRatingStatus" class="text-sm text-gray-600"></span>
-            <button id="submitAllRatingsBtn" type="button"
-                class="btn-submit-rating">
-                Submit Ratings
-            </button>
         </div>
     </div>
 </div>

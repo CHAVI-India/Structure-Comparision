@@ -318,7 +318,22 @@ def _prepare_ct_data(ct_files):
         if not hasattr(ct_file, 'pixel_array'):
             continue
 
-        pixel_array = ct_file.pixel_array
+        pixel_array = ct_file.pixel_array.astype(float)
+
+        rescale_intercept = getattr(ct_file, 'RescaleIntercept', 0.0)
+        if hasattr(rescale_intercept, '__iter__'):
+            rescale_intercept = float(rescale_intercept[0]) if rescale_intercept else 0.0
+        else:
+            rescale_intercept = float(rescale_intercept) if rescale_intercept is not None else 0.0
+
+        rescale_slope = getattr(ct_file, 'RescaleSlope', 1.0)
+        if hasattr(rescale_slope, '__iter__'):
+            rescale_slope = float(rescale_slope[0]) if rescale_slope else 1.0
+        else:
+            rescale_slope = float(rescale_slope) if rescale_slope is not None else 1.0
+
+        if rescale_slope != 1.0 or rescale_intercept != 0.0:
+            pixel_array = (pixel_array * rescale_slope) + rescale_intercept
         image_position = getattr(ct_file, 'ImagePositionPatient', [0, 0, 0])
         if hasattr(image_position, '__iter__'):
             image_position = [float(x) for x in image_position]

@@ -94,10 +94,6 @@
                 <div class="flex items-center gap-4 mb-3">
                     <span class="font-medium text-sm">Window/Level Presets:</span>
                     <div class="flex gap-2 flex-wrap">
-                        <button onclick="setWindowLevel('pan')"
-                            class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
-                            Pan
-                        </button>
                         <button onclick="setWindowLevel('soft_tissue')"
                             class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
                             Soft Tissue
@@ -127,15 +123,15 @@
                 <div class="flex items-center gap-4">
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium">Window:</label>
-                        <input type="range" id="windowSlider" min="1" max="4000" value="2000" class="w-32"
+                        <input type="range" id="windowSlider" min="1" max="4000" value="400" class="w-32"
                             onchange="updateWindowLevel()">
-                        <span id="windowValue" class="text-sm w-16">2000</span>
+                        <span id="windowValue" class="text-sm w-16">400</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <label class="text-sm font-medium">Level:</label>
-                        <input type="range" id="levelSlider" min="-1000" max="3000" value="1000" class="w-32"
+                        <input type="range" id="levelSlider" min="-1000" max="3000" value="40" class="w-32"
                             onchange="updateWindowLevel()">
-                        <span id="levelValue" class="text-sm w-16">1000</span>
+                        <span id="levelValue" class="text-sm w-16">40</span>
                     </div>
                 </div>
             </div>
@@ -155,12 +151,12 @@
             <div class="viewer-container">
                 <div class="viewer-panel">
                     <canvas id="ctViewer1" class="viewer-canvas"></canvas>
-                    <div class="viewer-overlay viewer-label" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_dicom_label|default:'RTSTRUCT 1'|truncatechars:50 }}</div>
+                    <div class="viewer-overlay viewer-label" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_label|default:'RTSTRUCT 1'|truncatechars:50 }}</div>
                     <div class="viewer-overlay viewer-zoom" id="zoom1">100%</div>
                 </div>
                 <div class="viewer-panel">
                     <canvas id="ctViewer2" class="viewer-canvas"></canvas>
-                    <div class="viewer-overlay viewer-label" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_dicom_label|default:'RTSTRUCT 2'|truncatechars:50 }}</div>
+                    <div class="viewer-overlay viewer-label" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_label|default:'RTSTRUCT 2'|truncatechars:50 }}</div>
                     <div class="viewer-overlay viewer-zoom" id="zoom2">100%</div>
                 </div>
             </div>

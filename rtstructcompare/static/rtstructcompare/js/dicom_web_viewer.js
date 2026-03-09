@@ -7,8 +7,8 @@ const commonStructures = dicomViewerData.commonStructures || [];
 let currentSliceIndex = 0;
 let selectedROIs = new Set();
 let isSyncingROIs = false;
-let currentWindow = 2000;
-let currentLevel = 1000;
+let currentWindow = 400;
+let currentLevel = 40;
 let zoomLevel1 = 1;
 let zoomLevel2 = 1;
 let panOffset1 = { x: 0, y: 0 };
@@ -47,7 +47,6 @@ function getCoverTransform(canvasWidth, canvasHeight, sliceWidth, sliceHeight, z
 }
 
 const windowLevelPresets = {
-    pan: { window: 400, level: 0 },
     soft_tissue: { window: 400, level: 40 },
     lung: { window: 1500, level: -600 },
     bone: { window: 2000, level: 300 },
@@ -83,25 +82,7 @@ function initializeViewer() {
         sliceSlider.value = currentSliceIndex;
     }
 
-    // Select-all checkbox for ROI inclusion
-    const selectAll = document.getElementById('roiRatingSelectAll');
     const rowCheckboxes = document.querySelectorAll('.roi-rating-include');
-    if (selectAll) {
-        selectAll.addEventListener('change', () => {
-            rowCheckboxes.forEach((cb) => {
-                cb.checked = selectAll.checked;
-            });
-        });
-    }
-    rowCheckboxes.forEach((cb) => {
-        cb.addEventListener('change', () => {
-            if (!selectAll) return;
-            const allChecked = Array.from(rowCheckboxes).every((c) => c.checked);
-            const anyChecked = Array.from(rowCheckboxes).some((c) => c.checked);
-            selectAll.indeterminate = !allChecked && anyChecked;
-            selectAll.checked = allChecked;
-        });
-    });
     updateSliceInfo();
 
     const windowSlider = document.getElementById('windowSlider');
