@@ -1,9 +1,13 @@
 asgiref==3.11.0
 Django==6.0.1
 django-allauth==65.14.0
+django-storages==1.14.6
+django-s3file==7.0.1
+boto3==1.34.162
 numpy==2.4.1
 pydicom==3.0.1
 scipy==1.17.0
 sqlparse==0.5.5
 psycopg==3.2.1
 openpyxl==3.1.5
+python-dotenv==1.0.1

@@ -2,24 +2,34 @@
 Views for DICOM Structure Comparison
 Essential functions only: home, patients, dicom_web_viewer
 """
-from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse, HttpResponseForbidden
+import logging
+from collections import defaultdict
+from datetime import timedelta
+from uuid import uuid4
+
+from botocore.exceptions import BotoCoreError, ClientError
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
+from django.db.models import Q, Count
+from django.db.models.functions import TruncDate
+from django.http import JsonResponse, HttpResponseForbidden
+from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.conf import settings
-from django.db.models import Q, Count
-from django.db.models.functions import TruncDate
-from django.utils import timezone
-from datetime import timedelta
-import zipfile
+
+import json
 import shutil
-from uuid import uuid4
+from pathlib import Path
+import traceback
+import zipfile
+
+from .forms import DicomFolderImportForm
 from .models import (
     DICOMSeries,
     DICOMInstance,
@@ -31,11 +41,9 @@ from .models import (
     PatientAssignment,
     GroupPatientAssignment,
 )
-import json
-from pathlib import Path
-import traceback
-from .services.dicom_import_service import import_dicom_directory, DicomImportError
+from .services.dicom_import_service import import_dicom_file_objects, DicomImportError
 from .services.dicom_viewer_service import build_viewer_context, DicomViewerError
+from .services.storage_service import get_s3_client, parse_s3_uri
 from .services.admin_dashboard_service import (
     AdminDashboardActionService,
     AdminDashboardStatus,
@@ -53,6 +61,8 @@ from .services.feedback_query_service import (
 )
 from .services.patient_context_service import build_patient_context, is_admin_user
 
+
+logger = logging.getLogger(__name__)
 STATUS_MESSAGE_TIMEOUT_MS = 10000
 
 
@@ -122,9 +132,22 @@ def delete_patient(request, patient_uuid):
 
     patient = get_object_or_404(Patient, id=patient_uuid)
     identifier = patient.patient_id or str(patient_uuid)
+    try:
+        deleted_objects = _delete_patient_s3_objects(patient)
+    except Exception as exc:
+        logger.exception("Failed to delete S3 data for patient %s", patient.id)
+        messages.error(
+            request,
+            f"Could not delete S3 objects for patient {identifier}: {exc}",
+        )
+        return _redirect_back(request)
+
     patient.delete()
 
-    messages.success(request, f"Deleted patient {identifier} and related data.")
+    success_message = f"Deleted patient {identifier} and related data."
+    if deleted_objects:
+        success_message += f" Removed {deleted_objects} S3 object(s)."
+    messages.success(request, success_message)
     return _redirect_back(request)
 
 
@@ -190,6 +213,46 @@ def admin_dashboard_charts(request):
 
     payload = build_admin_dashboard_chart_data(range_days=range_days)
     return JsonResponse(payload)
+
+
+def _delete_patient_s3_objects(patient):
+    """Remove all S3 objects tied to the patient's DICOM instances."""
+    instance_paths = list(
+        DICOMInstance.objects
+        .filter(series__study__patient=patient, instance_path__startswith='s3://')
+        .values_list('instance_path', flat=True)
+    )
+
+    if not instance_paths:
+        return 0
+
+    s3_keys = defaultdict(set)
+    for path in instance_paths:
+        try:
+            bucket, key = parse_s3_uri(path)
+        except ValueError:
+            logger.warning("Skipping invalid S3 URI for patient %s: %s", patient.id, path)
+            continue
+        s3_keys[bucket].add(key)
+
+    if not s3_keys:
+        return 0
+
+    client = get_s3_client()
+    total_deleted = 0
+
+    for bucket, keys in s3_keys.items():
+        key_list = [{'Key': key} for key in sorted(keys)]
+        for start in range(0, len(key_list), 1000):
+            chunk = key_list[start:start + 1000]
+            try:
+                response = client.delete_objects(Bucket=bucket, Delete={'Objects': chunk})
+            except (ClientError, BotoCoreError) as exc:
+                raise RuntimeError(f'Failed deleting S3 objects from {bucket}: {exc}') from exc
+
+            total_deleted += len(response.get('Deleted', []))
+
+    return total_deleted
 
 
 @login_required
@@ -309,74 +372,44 @@ def dicom_import(request):
         status_type = flash.get('type', 'info')
         import_stats = flash.get('stats')
 
-    if request.method == 'POST':
-        uploaded_file = request.FILES.get('dicom_archive')
+    form = DicomFolderImportForm()
 
-        if not uploaded_file:
-            status_message = 'Please select a ZIP file to upload.'
+    if request.method == 'POST':
+        uploaded_files = request.FILES.getlist('dicom_files')
+
+        if not uploaded_files:
+            status_message = 'Please select a folder containing DICOM files.'
             status_type = 'error'
-        elif not uploaded_file.name.lower().endswith('.zip'):
-            status_message = 'Only .zip archives are supported.'
+        elif len(uploaded_files) == 1:
+            status_message = 'Folder uploads only. Please select a directory, not a single file.'
             status_type = 'error'
         else:
-            storage_root = Path(settings.DICOM_STORAGE_ROOT)
-            storage_root.mkdir(parents=True, exist_ok=True)
-
-            timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
-            import_slug = f"import_{timestamp}_{uuid4().hex[:8]}"
-            import_root = storage_root / import_slug
-            upload_dir = import_root / 'uploads'
-            extract_dir = import_root / 'extracted'
-
-            zip_path = upload_dir / uploaded_file.name if uploaded_file else None
-
             try:
-                upload_dir.mkdir(parents=True, exist_ok=True)
-                extract_dir.mkdir(parents=True, exist_ok=True)
-
-                with zip_path.open('wb+') as destination:
-                    for chunk in uploaded_file.chunks():
-                        destination.write(chunk)
-
-                with zipfile.ZipFile(zip_path) as archive:
-                    archive.extractall(extract_dir)
-
-                import_stats = import_dicom_directory(extract_dir)
+                import_stats = import_dicom_file_objects(uploaded_files)
                 request.session['dicom_import_status'] = {
                     'message': 'DICOM data imported successfully.',
                     'type': 'success',
                     'stats': import_stats,
                 }
                 return redirect('dicom_import')
-            except zipfile.BadZipFile:
-                shutil.rmtree(import_root, ignore_errors=True)
-                request.session['dicom_import_status'] = {
-                    'message': 'Uploaded file is not a valid ZIP archive.',
-                    'type': 'error',
-                }
-                return redirect('dicom_import')
             except DicomImportError as exc:
-                shutil.rmtree(import_root, ignore_errors=True)
                 request.session['dicom_import_status'] = {
                     'message': str(exc),
                     'type': 'error',
                 }
                 return redirect('dicom_import')
             except Exception as exc:
-                shutil.rmtree(import_root, ignore_errors=True)
                 request.session['dicom_import_status'] = {
                     'message': f'Unexpected error: {exc}',
                     'type': 'error',
                 }
                 return redirect('dicom_import')
-            finally:
-                if zip_path and zip_path.exists():
-                    zip_path.unlink(missing_ok=True)
 
     context = {
         'status_message': status_message,
         'status_type': status_type,
         'import_stats': import_stats,
+        'form': form,
         'patient_count': Patient.objects.count(),
         'study_count': DICOMStudy.objects.count(),
         'series_count': DICOMSeries.objects.count(),

@@ -17,7 +17,7 @@
         <div class="flex flex-col gap-2 mb-6">
             <p class="text-sm uppercase tracking-[0.3em] text-slate-400 font-semibold">DICOM ingestion</p>
             <h1 class="text-3xl font-bold text-slate-900">Upload patient datasets</h1>
-            <p class="text-slate-500">Upload a ZIP that contains CT, RTSTRUCT, and related files. We'll scan every folder inside and add any supported studies automatically.</p>
+            <p class="text-slate-500">Upload a folder that contains CT, RTSTRUCT, and related DICOM files. We'll scan every subfolder and import each study automatically.</p>
         </div>
 
         {% if status_message %}
@@ -29,14 +29,13 @@
         <form method="post" enctype="multipart/form-data" class="space-y-6 mt-6" id="dicomImportForm">
             {% csrf_token %}
             <div class="upload-area">
-                <input type="file" name="dicom_archive" id="dicom_archive" accept=".zip" required class="sr-only">
-                <label for="dicom_archive" class="flex flex-col gap-2 cursor-pointer">
-                    <span class="text-lg font-semibold text-slate-800">Drop your ZIP here or click to browse</span>
-                    <span class="text-sm text-slate-500">Accepted format: .zip · The archive can contain nested folders.</span>
+                {{ form.dicom_files }}
+                <label for="dicom_files" class="flex flex-col gap-2 cursor-pointer">
+                    <span class="text-lg font-semibold text-slate-800">Select a DICOM folder</span>
+                    <span class="text-sm text-slate-500">Structure example: folder → patient-1/series/*.dcm, patient-2/... Chromium browsers support folder selection; other browsers can multi-select .dcm files.</span>
                 </label>
                 <div id="selected_file_name" class="text-sm text-slate-400 mt-3 font-medium">No file selected yet.</div>
             </div>
-
             <div class="flex flex-col gap-2">
                 <span class="text-xs text-slate-500">*Uploading may take a few minutes—stay on this page until it completes.</span>
                 <button type="submit" class="btn-primary" id="dicomImportSubmit">Start Import</button>
