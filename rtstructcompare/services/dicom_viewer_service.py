@@ -1,10 +1,11 @@
 import json
 from io import BytesIO
 from pathlib import Path
-import pydicom
+
 import boto3
-from django.conf import settings
+import pydicom
 from botocore.exceptions import BotoCoreError, ClientError
+from django.conf import settings
 
 from ..models import (
     DICOMStudy,
@@ -16,6 +17,7 @@ from ..models import (
 )
 
 _s3_client = None
+_DEFAULT_SORT_VALUE = 0.0
 
 
 class DicomViewerError(Exception):
@@ -29,19 +31,18 @@ def build_viewer_context(patient, *, user=None):
         raise DicomViewerError(f'No studies found for patient {patient.patient_id}')
 
     latest_study = studies.first()
-    ct_file_paths, rtstruct_file_paths = _load_dicom_files_from_database(patient)
+    ct_instances, rtstruct_file_paths = _load_dicom_files_from_database(patient)
 
-    if not ct_file_paths:
+    if not ct_instances:
         raise DicomViewerError(f'No CT files found for patient {patient.patient_id}')
 
     if len(rtstruct_file_paths) < 2:
         raise DicomViewerError(
             f'Need at least 2 RTSTRUCT files for comparison, found {len(rtstruct_file_paths)}. '
-            f'Found {len(ct_file_paths)} CT files.'
+            f'Found {len(ct_instances)} CT files.'
         )
 
-    dicom_files = _load_dicom_files_from_paths(ct_file_paths + rtstruct_file_paths)
-    ct_files, rtstruct_files = _analyze_dicom_data(dicom_files)
+    rtstruct_files = _load_rtstruct_datasets(rtstruct_file_paths)
 
     rt1_data, rt2_data = [], []
     rt1_contours, rt2_contours = {}, {}
@@ -68,7 +69,7 @@ def build_viewer_context(patient, *, user=None):
         names2 = {s['name'] for s in rt2_data}
         common_structures = sorted(list(names1 & names2))
 
-    ct_data = _prepare_ct_data(ct_files)
+    ct_data = _prepare_ct_data(ct_instances)
 
     roi_data = {}
     if common_structures:
@@ -109,7 +110,7 @@ def build_viewer_context(patient, *, user=None):
         'study_date': str(latest_study.study_date) if latest_study.study_date else 'Unknown',
         'study_description': latest_study.study_description,
         'study_uid': latest_study.study_instance_uid,
-        'ct_count': len(ct_files),
+        'ct_count': len(ct_data),
         'rtstruct_count': len(rtstruct_files),
         'rt1_roi_count': len(rt1_data),
         'rt2_roi_count': len(rt2_data),
@@ -132,7 +133,7 @@ def build_viewer_context(patient, *, user=None):
 
 
 def _load_dicom_files_from_database(patient):
-    ct_file_refs = []
+    ct_instances = []
     rtstruct_file_refs = []
 
     instances = (
@@ -147,26 +148,30 @@ def _load_dicom_files_from_database(patient):
         if not path:
             continue
         if modality == 'CT':
-            ct_file_refs.append(path)
+            ct_instances.append({
+                'path': path,
+                'instance_number': instance.instance_number,
+                'sop_instance_uid': instance.sop_instance_uid,
+            })
         elif modality == 'RTSTRUCT':
             rtstruct_file_refs.append(path)
 
-    return ct_file_refs, rtstruct_file_refs
+    return ct_instances, rtstruct_file_refs
 
 
-def _load_dicom_files_from_paths(file_paths):
-    dicom_files = []
+def _load_rtstruct_datasets(file_paths):
+    datasets = []
     for file_path in file_paths:
         try:
-            dataset = _read_dicom_dataset(file_path)
+            dataset = _read_dicom_dataset(file_path, stop_before_pixels=True)
             if dataset:
-                dicom_files.append(dataset)
+                datasets.append(dataset)
         except Exception:
             continue
-    return dicom_files
+    return datasets
 
 
-def _read_dicom_dataset(file_reference):
+def _read_dicom_dataset(file_reference, *, stop_before_pixels=True):
     if not file_reference:
         return None
 
@@ -176,13 +181,16 @@ def _read_dicom_dataset(file_reference):
         try:
             obj = client.get_object(Bucket=bucket, Key=key)
             body = obj['Body'].read()
-            return pydicom.dcmread(BytesIO(body))
-        except (ClientError, BotoCoreError):
+            ds = pydicom.dcmread(BytesIO(body), stop_before_pixels=stop_before_pixels)
+            # Store the original reference so we can generate a URL later
+            ds.file_reference = file_reference 
+            return ds
+        except Exception:
             return None
     else:
         path = Path(file_reference)
         if path.exists():
-            return pydicom.dcmread(path)
+            return pydicom.dcmread(path, stop_before_pixels=stop_before_pixels)
     return None
 
 
@@ -213,18 +221,6 @@ def _get_s3_client():
 
         _s3_client = boto3.client('s3', **client_kwargs)
     return _s3_client
-
-
-def _analyze_dicom_data(dicom_files):
-    ct_files = []
-    rtstruct_files = []
-    for ds in dicom_files:
-        modality = getattr(ds, 'Modality', None)
-        if modality == 'CT':
-            ct_files.append(ds)
-        elif modality == 'RTSTRUCT':
-            rtstruct_files.append(ds)
-    return ct_files, rtstruct_files
 
 
 def _analyze_rtstruct(rtstruct_file):
@@ -304,80 +300,113 @@ def _extract_roi_contours(rtstruct_file):
     return roi_contours
 
 
-def _prepare_ct_data(ct_files):
-    if not ct_files:
+def _prepare_ct_data(ct_instances):
+    if not ct_instances:
         return []
 
-    ct_files_sorted = sorted(
-        ct_files,
-        key=lambda x: float(getattr(x, 'ImagePositionPatient', [0, 0, 0])[2]) if hasattr(x, 'ImagePositionPatient') else 0,
-    )
+    s3_client = _get_s3_client()
+    ct_metadata = []
 
-    ct_data = []
-    for i, ct_file in enumerate(ct_files_sorted):
-        if not hasattr(ct_file, 'pixel_array'):
+    for instance in ct_instances:
+        file_reference = instance.get('path')
+        if not file_reference:
             continue
 
-        pixel_array = ct_file.pixel_array.astype(float)
+        metadata = _read_ct_metadata(file_reference)
+        if not metadata:
+            continue
 
-        rescale_intercept = getattr(ct_file, 'RescaleIntercept', 0.0)
-        if hasattr(rescale_intercept, '__iter__'):
-            rescale_intercept = float(rescale_intercept[0]) if rescale_intercept else 0.0
-        else:
-            rescale_intercept = float(rescale_intercept) if rescale_intercept is not None else 0.0
+        metadata['file_reference'] = file_reference
+        metadata['instance_number'] = instance.get('instance_number')
+        metadata['sort_key'] = _derive_slice_sort_key(metadata, instance)
+        ct_metadata.append(metadata)
 
-        rescale_slope = getattr(ct_file, 'RescaleSlope', 1.0)
-        if hasattr(rescale_slope, '__iter__'):
-            rescale_slope = float(rescale_slope[0]) if rescale_slope else 1.0
-        else:
-            rescale_slope = float(rescale_slope) if rescale_slope is not None else 1.0
+    if not ct_metadata:
+        return []
 
-        if rescale_slope != 1.0 or rescale_intercept != 0.0:
-            pixel_array = (pixel_array * rescale_slope) + rescale_intercept
-        image_position = getattr(ct_file, 'ImagePositionPatient', [0, 0, 0])
-        if hasattr(image_position, '__iter__'):
-            image_position = [float(x) for x in image_position]
-        else:
-            image_position = [0, 0, 0]
+    ct_metadata.sort(key=lambda item: item.get('sort_key', _DEFAULT_SORT_VALUE))
 
-        slice_location = getattr(ct_file, 'SliceLocation', 0)
-        if hasattr(slice_location, '__iter__'):
-            slice_location = float(slice_location[0]) if slice_location else 0
-        else:
-            slice_location = float(slice_location) if slice_location else 0
+    ct_data = []
+    for idx, slice_meta in enumerate(ct_metadata):
+        bucket, key = _parse_s3_uri(slice_meta['file_reference'])
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket, 'Key': key},
+            ExpiresIn=3600,
+        )
 
-        instance_number = getattr(ct_file, 'InstanceNumber', i + 1)
-        if hasattr(instance_number, '__iter__'):
-            instance_number = int(instance_number[0]) if instance_number else i + 1
-        else:
-            instance_number = int(instance_number) if instance_number else i + 1
-
-        pixel_spacing = getattr(ct_file, 'PixelSpacing', [1.0, 1.0])
-        if hasattr(pixel_spacing, '__iter__'):
-            pixel_spacing = [float(x) for x in pixel_spacing]
-        else:
-            pixel_spacing = [1.0, 1.0]
-
-        image_orientation = getattr(ct_file, 'ImageOrientationPatient', [1, 0, 0, 0, 1, 0])
-        if hasattr(image_orientation, '__iter__'):
-            image_orientation = [float(x) for x in image_orientation]
-        else:
-            image_orientation = [1, 0, 0, 0, 1, 0]
-
-        slice_data = {
-            'index': i,
-            'width': int(pixel_array.shape[1]),
-            'height': int(pixel_array.shape[0]),
-            'pixels': pixel_array.flatten().tolist(),
-            'image_position': image_position,
-            'slice_location': slice_location,
-            'instance_number': instance_number,
-            'pixel_spacing': pixel_spacing,
-            'image_orientation': image_orientation,
-        }
-        ct_data.append(slice_data)
+        ct_data.append({
+            'index': idx,
+            'url': presigned_url,
+            'width': slice_meta['width'],
+            'height': slice_meta['height'],
+            'image_position': slice_meta['image_position'],
+            'pixel_spacing': slice_meta['pixel_spacing'],
+            'intercept': slice_meta['intercept'],
+            'slope': slice_meta['slope'],
+        })
 
     return ct_data
+
+
+def _read_ct_metadata(file_reference):
+    ds = _read_dicom_dataset(file_reference, stop_before_pixels=True)
+    if not ds:
+        return None
+
+    def _safe_list(value, default):
+        if value is None:
+            return default
+        try:
+            return [float(x) for x in value]
+        except Exception:
+            return default
+
+    def _safe_float(value, default):
+        try:
+            if value is None:
+                return default
+            return float(value)
+        except Exception:
+            return default
+
+    metadata = {
+        'width': int(getattr(ds, 'Columns', 512)),
+        'height': int(getattr(ds, 'Rows', 512)),
+        'image_position': _safe_list(getattr(ds, 'ImagePositionPatient', [0, 0, 0]), [0.0, 0.0, 0.0]),
+        'pixel_spacing': _safe_list(getattr(ds, 'PixelSpacing', [1.0, 1.0]), [1.0, 1.0]),
+        'intercept': _safe_float(getattr(ds, 'RescaleIntercept', 0), 0.0),
+        'slope': _safe_float(getattr(ds, 'RescaleSlope', 1), 1.0),
+        'slice_location': _safe_float(getattr(ds, 'SliceLocation', None), None),
+        'instance_number_from_file': getattr(ds, 'InstanceNumber', None),
+    }
+
+    return metadata
+
+
+def _derive_slice_sort_key(metadata, instance):
+    image_position = metadata.get('image_position')
+    if image_position and len(image_position) >= 3:
+        try:
+            return float(image_position[2])
+        except (TypeError, ValueError):
+            pass
+
+    slice_location = metadata.get('slice_location')
+    if slice_location is not None:
+        return slice_location
+
+    for candidate in (
+        metadata.get('instance_number_from_file'),
+        instance.get('instance_number'),
+    ):
+        if candidate is not None:
+            try:
+                return float(candidate)
+            except (TypeError, ValueError):
+                continue
+
+    return _DEFAULT_SORT_VALUE
 
 
 def _get_rtstruct_label(rtstruct_file, index):
