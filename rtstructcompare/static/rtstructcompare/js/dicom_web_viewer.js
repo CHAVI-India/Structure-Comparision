@@ -36,6 +36,30 @@ function syncCanvasSize(canvas) {
     return false;
 }
 
+function prefetchSlice(sliceIndex) {
+    if (sliceIndex < 0 || sliceIndex >= ctData.length) return;
+    const slice = ctData[sliceIndex];
+    if (!slice) return;
+    if (pixelCache.has(slice.index) || loadingSlices.has(slice.index)) return;
+
+    ensureSlicePixels(slice).catch((err) => {
+        console.warn('Slice prefetch failed', slice.index, err);
+    });
+}
+
+function prefetchSliceWindow(centerIndex) {
+    if (!ctData.length || PREFETCH_WINDOW_SIZE <= 0) return;
+
+    const halfWindow = Math.floor(PREFETCH_WINDOW_SIZE / 2);
+    const start = Math.max(0, centerIndex - halfWindow);
+    const end = Math.min(ctData.length - 1, centerIndex + halfWindow);
+
+    for (let idx = start; idx <= end; idx += 1) {
+        prefetchSlice(idx);
+    }
+    prefetchSlice(centerIndex);
+}
+
 function getCoverTransform(canvasWidth, canvasHeight, sliceWidth, sliceHeight, zoomLevel, panOffset) {
     const baseScale = Math.max(canvasWidth / sliceWidth, canvasHeight / sliceHeight);
     const scale = baseScale * zoomLevel;
@@ -95,6 +119,7 @@ function initializeViewer() {
     if (levelValue) levelValue.textContent = currentLevel;
 
     displaySlice();
+    prefetchSliceWindow(currentSliceIndex);
     setupMouseHandlers();
     updateZoomDisplays();
 
@@ -107,7 +132,7 @@ function initializeViewer() {
     });
 }
 
-function displaySlice() {
+async function displaySlice() {
     const canvas1 = document.getElementById('ctViewer1');
     const canvas2 = document.getElementById('ctViewer2');
     if (!canvas1 || !canvas2) return;
@@ -150,6 +175,7 @@ function displaySlice() {
     drawROIOverlays(ctx2, canvas2CssWidth, canvas2CssHeight, rt2Contours, ctData[currentSliceIndex], zoomLevel2, panOffset2);
 
     updateZoomDisplays();
+    prefetchSliceWindow(currentSliceIndex);
 }
 
 function updateSliceInfo() {
@@ -197,33 +223,128 @@ function updateWindowLevel() {
     displaySlice();
 }
 
-function displayCTSlice(ctx, canvasWidth, canvasHeight, slice, zoomLevel = 1.0, panOffset = { x: 0, y: 0 }) {
-    const imageData = ctx.createImageData(slice.width, slice.height);
+const pixelCache = new Map();
+const loadingSlices = new Map();
+const PIXEL_CACHE_LIMIT = 64;
+const PREFETCH_WINDOW_SIZE = 10;
 
+function cachePixels(sliceIndex, pixels) {
+    if (pixelCache.has(sliceIndex)) {
+        pixelCache.set(sliceIndex, pixels);
+        return;
+    }
+    if (pixelCache.size >= PIXEL_CACHE_LIMIT) {
+        const oldestKey = pixelCache.keys().next().value;
+        if (oldestKey !== undefined) {
+            pixelCache.delete(oldestKey);
+        }
+    }
+    pixelCache.set(sliceIndex, pixels);
+}
+
+function extractRawPixels(dataSet) {
+    const pixelDataElement = dataSet.elements.x7fe00010;
+    if (!pixelDataElement) {
+        throw new Error('Pixel data element (7FE0,0010) missing');
+    }
+    if (pixelDataElement.encapsulatedPixelData) {
+        throw new Error('Encapsulated (compressed) pixel data is not supported yet');
+    }
+    const bytesPerSample = 2;
+    const numPixels = pixelDataElement.length / bytesPerSample;
+    const byteArray = dataSet.byteArray;
+    const offset = pixelDataElement.dataOffset;
+    const rawPixels = new Uint16Array(numPixels);
+    const source = new DataView(byteArray.buffer, offset, pixelDataElement.length);
+
+    for (let i = 0; i < numPixels; i += 1) {
+        rawPixels[i] = source.getUint16(i * bytesPerSample, true);
+    }
+    return rawPixels;
+}
+
+async function fetchAndDecodeSlice(slice) {
+    const response = await fetch(slice.url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+    const arrayBuffer = await response.arrayBuffer();
+    const byteArray = new Uint8Array(arrayBuffer);
+    const dataSet = dicomParser.parseDicom(byteArray);
+    const rawPixels = extractRawPixels(dataSet);
+
+    const pixels = new Float32Array(rawPixels.length);
+    const slope = slice.slope || 1;
+    const intercept = slice.intercept || 0;
+
+    for (let i = 0; i < rawPixels.length; i += 1) {
+        pixels[i] = (rawPixels[i] * slope) + intercept;
+    }
+
+    return pixels;
+}
+
+async function ensureSlicePixels(slice) {
+    const cached = pixelCache.get(slice.index);
+    if (cached) return cached;
+
+    let inflight = loadingSlices.get(slice.index);
+    if (!inflight) {
+        inflight = (async () => {
+            const decoded = await fetchAndDecodeSlice(slice);
+            cachePixels(slice.index, decoded);
+        })();
+        loadingSlices.set(slice.index, inflight);
+    }
+
+    try {
+        await inflight;
+    } finally {
+        if (loadingSlices.get(slice.index) === inflight) {
+            loadingSlices.delete(slice.index);
+        }
+    }
+
+    return pixelCache.get(slice.index);
+}
+
+async function displayCTSlice(ctx, canvasWidth, canvasHeight, slice, zoomLevel = 1.0, panOffset = { x: 0, y: 0 }) {
+    if (!slice || !slice.url) {
+        console.warn("Invalid slice or missing URL");
+        return;
+    }
+
+    let pixels;
+    try {
+        pixels = await ensureSlicePixels(slice);
+    } catch (err) {
+        console.error("DICOM Fetch Error:", err);
+        return;
+    }
+
+    const imageData = ctx.createImageData(slice.width, slice.height);
     const windowWidth = currentWindow;
     const windowLevel = currentLevel;
     const minValue = windowLevel - windowWidth / 2;
     const maxValue = windowLevel + windowWidth / 2;
-    const range = maxValue - minValue;
+    const range = maxValue - minValue || 1;
 
-    for (let i = 0; i < slice.pixels.length; i += 1) {
-        const pixelValue = slice.pixels[i];
-
-        let displayValue = ((pixelValue - minValue) / range) * 255;
+    for (let i = 0; i < pixels.length; i++) {
+        const val = pixels[i];
+        let displayValue = ((val - minValue) / range) * 255;
         displayValue = Math.max(0, Math.min(255, displayValue));
-
-        imageData.data[i * 4] = displayValue;
-        imageData.data[i * 4 + 1] = displayValue;
-        imageData.data[i * 4 + 2] = displayValue;
-        imageData.data[i * 4 + 3] = 255;
+        const idx = i * 4;
+        imageData.data[idx] = displayValue;     // R
+        imageData.data[idx + 1] = displayValue; // G
+        imageData.data[idx + 2] = displayValue; // B
+        imageData.data[idx + 3] = 255;          // A
     }
 
     if (!_tempCanvas) {
         _tempCanvas = document.createElement('canvas');
         _tempCtx = _tempCanvas.getContext('2d');
     }
-    if (_tempCanvas.width !== slice.width) _tempCanvas.width = slice.width;
-    if (_tempCanvas.height !== slice.height) _tempCanvas.height = slice.height;
+    _tempCanvas.width = slice.width;
+    _tempCanvas.height = slice.height;
     _tempCtx.putImageData(imageData, 0, 0);
 
     const t = getCoverTransform(canvasWidth, canvasHeight, slice.width, slice.height, zoomLevel, panOffset);
