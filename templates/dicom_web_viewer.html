@@ -60,6 +60,15 @@
                 <strong>Error:</strong> {{ error }}
             </div>
             {% endif %}
+
+            <div id="userDetailsSuccessMessage"
+                class="hidden mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded flex items-center shadow-sm transition-opacity duration-300">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <strong>Submitted successfully!</strong>&nbsp;Good to go with rating.
+            </div>
         </div>
 
         <!-- Main Viewer -->
@@ -244,6 +253,9 @@
         </div>
 
         {% include "roi_ratings.html" %}
+
+        <!-- User Details Modal -->
+        {% include "user_details_modal.html" %}
 
     </div>
     <script>

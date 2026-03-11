@@ -36,4 +36,5 @@ urlpatterns = [
     path('api/load-dicom-data/', views.load_dicom_data, name='load_dicom_data'),
     path('api/get-dicom-slice/', views.get_dicom_slice, name='get_dicom_slice'),
     path('api/submit-feedback/', views.submit_feedback, name='submit_feedback'),
+    path('api/submit-user-details/', views.submit_user_details, name='submit_user_details'),
 ]
