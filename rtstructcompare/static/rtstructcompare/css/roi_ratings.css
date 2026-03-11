@@ -117,3 +117,83 @@
     color: white;
     text-decoration: none;
 }
+
+/* Rating Scale Legend Styling */
+.rating-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    font-weight: 500;
+}
+
+.rating-tag span {
+    opacity: 0.85;
+    font-weight: 400;
+    margin-left: 0.25rem;
+}
+
+/* Dark green for 9-10 (Excellent) */
+.rating-tag-10, .rating-tag-9 {
+    background-color: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+
+/* Light green for 8 (Very good) */
+.rating-tag-8 {
+    background-color: #f0fdfa;
+    color: #0f766e;
+    border-color: #99f6e4;
+}
+
+/* Yellow-green for 7 (Good) */
+.rating-tag-7 {
+    background-color: #fefce8;
+    color: #854d0e;
+    border-color: #fef08a;
+}
+
+/* Yellow for 6 (Good) */
+.rating-tag-6 {
+    background-color: #fffbeb;
+    color: #b45309;
+    border-color: #fde68a;
+}
+
+/* Orange for 5 (Fair) */
+.rating-tag-5 {
+    background-color: #fff7ed;
+    color: #c2410c;
+    border-color: #fed7aa;
+}
+
+/* Dark Orange for 4 (Fair) */
+.rating-tag-4 {
+    background-color: #ffedd5;
+    color: #ea580c;
+    border-color: #fdba74;
+}
+
+/* Light Red for 3 (Needs work) */
+.rating-tag-3 {
+    background-color: #fef2f2;
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+/* Red for 2 (Needs work) */
+.rating-tag-2 {
+    background-color: #fff1f2;
+    color: #be123c;
+    border-color: #fecdd3;
+}
+
+/* Dark Red for 1 (Needs work) */
+.rating-tag-1 {
+    background-color: #ffe4e6;
+    color: #9f1239;
+    border-color: #fda4af;
+}
