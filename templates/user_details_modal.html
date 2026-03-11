@@ -1,0 +1,143 @@
+<!-- User Details Modal -->
+{% if not has_user_details %}
+<div id="userDetailsModal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="p-4 border-b bg-gray-50">
+            <h3 class="text-xl font-bold text-gray-800">Welcome! Please complete your profile</h3>
+            <p class="text-sm text-gray-600 mt-1">We need this information to contextualize the comparison data.
+                You will only need to fill this out once.</p>
+        </div>
+
+        <div class="p-6 overflow-y-auto">
+            <form id="userDetailsForm" onsubmit="event.preventDefault(); submitUserDetails();">
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Years of experience post MD/DNB
+                        <span class="text-red-500">*</span></label>
+                    <input type="number" step="0.5" min="0" id="ud_experience" required
+                        class="shadow appearance-none border border-gray-300 rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. 2.5">
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">Clinical Experience</h4>
+
+                    <label class="flex items-center mb-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" id="ud_spec_breast" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-3 text-gray-700 text-sm">Site specialization in breast cancer</span>
+                    </label>
+
+                    <label class="flex items-center mb-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" id="ud_spec_hn" class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-3 text-gray-700 text-sm">Site specialization in head and neck
+                            cancer</span>
+                    </label>
+
+                    <label class="flex items-center mb-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" id="ud_routinely_segment"
+                            class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-3 text-gray-700 text-sm">Routinely segments brachial plexus</span>
+                    </label>
+
+                    <label class="flex items-center mb-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" id="ud_experience_auto"
+                            class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-3 text-gray-700 text-sm">Experience with an autosegmentation
+                            algorithm</span>
+                    </label>
+
+                    <label class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" id="ud_teaching_inst"
+                            class="form-checkbox h-5 w-5 text-blue-600 rounded">
+                        <span class="ml-3 text-gray-700 text-sm">Works in an academic teaching institute</span>
+                    </label>
+                </div>
+
+                <div id="ud_error"
+                    class="hidden mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm font-medium">
+                </div>
+
+                <!-- Hidden submit button so hitting Enter works -->
+                <button type="submit" class="hidden"></button>
+            </form>
+        </div>
+
+        <div class="p-4 border-t bg-gray-50 flex justify-end">
+            <button type="button" id="ud_submit_btn" onclick="submitUserDetails()"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                Save Details & Continue
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function submitUserDetails() {
+        const experience = document.getElementById('ud_experience').value;
+        const errorDiv = document.getElementById('ud_error');
+
+        if (!experience || isNaN(experience)) {
+            errorDiv.textContent = "Please enter your years of experience as a number.";
+            errorDiv.classList.remove('hidden');
+            return;
+        }
+
+        const data = {
+            experience_post_md_dnb: parseFloat(experience),
+            specialization_in_breast: document.getElementById('ud_spec_breast').checked,
+            specialization_in_head_neck: document.getElementById('ud_spec_hn').checked,
+            routinely_segment_brachial_plexus: document.getElementById('ud_routinely_segment').checked,
+            experience_in_autosegmentation: document.getElementById('ud_experience_auto').checked,
+            works_in_teaching_institute: document.getElementById('ud_teaching_inst').checked
+        };
+
+        const btn = document.getElementById('ud_submit_btn');
+        btn.disabled = true;
+        btn.textContent = "Saving...";
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+        errorDiv.classList.add('hidden');
+
+        fetch('/api/submit-user-details/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    // Fade out animation
+                    const modal = document.getElementById('userDetailsModal');
+                    modal.style.transition = 'opacity 0.3s ease-out';
+                    modal.style.opacity = '0';
+                    setTimeout(() => {
+                        modal.remove();
+                        // Show the success message on the DICOM viewer page
+                        const successAlert = document.getElementById('userDetailsSuccessMessage');
+                        if (successAlert) {
+                            successAlert.classList.remove('hidden');
+
+                            // Optional: Hide the alert smoothly after 5 seconds
+                            setTimeout(() => {
+                                successAlert.style.opacity = '0';
+                                setTimeout(() => {
+                                    successAlert.classList.add('hidden');
+                                    successAlert.style.opacity = '1';
+                                }, 300);
+                            }, 5000);
+                        }
+                    }, 300);
+                } else {
+                    throw new Error(result.error || 'Failed to save details');
+                }
+            })
+            .catch(err => {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = "Save Details & Continue";
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            });
+    }
+</script>
+{% endif %}

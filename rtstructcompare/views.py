@@ -40,6 +40,7 @@ from .models import (
     Roi,
     PatientAssignment,
     GroupPatientAssignment,
+    UserDetails,
 )
 from .services.dicom_import_service import import_dicom_file_objects, DicomImportError
 from .services.dicom_viewer_service import build_viewer_context, DicomViewerError
@@ -639,6 +640,7 @@ def dicom_web_viewer(request, patient_uuid=None):
             **viewer_payload,
             'patient_uuid': patient_uuid,
             'available_patients': Patient.objects.all().order_by('patient_id'),
+            'has_user_details': hasattr(request.user, 'details') if request.user.is_authenticated else False,
         }
 
         return render(request, 'dicom_web_viewer.html', context)
@@ -705,5 +707,38 @@ def submit_feedback(request):
         return JsonResponse(response, status=result.status_code)
     except (json.JSONDecodeError, ValueError, TypeError) as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def submit_user_details(request):
+    """Save user profile details from the viewer modal."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Authentication required'}, status=401)
+        
+    try:
+        data = json.loads(request.body or '{}')
+        experience_val = data.get('experience_post_md_dnb')
+        if experience_val == "" or experience_val is None:
+            return JsonResponse({'success': False, 'error': 'Experience is required.'}, status=400)
+            
+        try:
+            exp_val = float(experience_val)
+        except ValueError:
+            return JsonResponse({'success': False, 'error': 'Experience must be a valid number.'}, status=400)
+            
+        UserDetails.objects.update_or_create(
+            user=request.user,
+            defaults={
+                'experience_post_md_dnb': exp_val,
+                'specialization_in_breast': bool(data.get('specialization_in_breast')),
+                'specialization_in_head_neck': bool(data.get('specialization_in_head_neck')),
+                'routinely_segment_brachial_plexus': bool(data.get('routinely_segment_brachial_plexus')),
+                'experience_in_autosegmentation': bool(data.get('experience_in_autosegmentation')),
+                'works_in_teaching_institute': bool(data.get('works_in_teaching_institute')),
+            }
+        )
+        return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

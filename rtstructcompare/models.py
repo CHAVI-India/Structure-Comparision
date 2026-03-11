@@ -247,3 +247,36 @@ class Feedback(models.Model):
         db_table = "roi_feedbacks"
         ordering = ['-created_at']
 
+
+class UserDetails(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='details')
+    experience_post_md_dnb = models.FloatField(verbose_name="Years of experience post MD/DNB")
+    specialization_in_breast = models.BooleanField(
+        default=False, 
+        verbose_name="Site specialization in breast cancer"
+    )
+    specialization_in_head_neck = models.BooleanField(
+        default=False, 
+        verbose_name="Site specialization in head and neck cancer"
+    )
+    routinely_segment_brachial_plexus = models.BooleanField(
+        default=False, 
+        verbose_name="Routinely segments brachial plexus"
+    )
+    experience_in_autosegmentation = models.BooleanField(
+        default=False, 
+        verbose_name="Experience with an autosegmentation algorithm"
+    )
+    works_in_teaching_institute = models.BooleanField(
+        default=False, 
+        verbose_name="Works in an academic teaching institute"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.id}"
+    class Meta:
+        db_table = "user_details"
+        ordering = ['-created_at']
