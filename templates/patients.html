@@ -6,13 +6,16 @@
     {% load static %}
     <link rel="stylesheet" href="{% static 'rtstructcompare/css/patients.css' %}">
     <link rel="stylesheet" href="{% static 'rtstructcompare/css/utils/pagination.css' %}">
+    <link rel="stylesheet" href="{% static 'rtstructcompare/css/utils/loading_spinner.css' %}">
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'rtstructcompare/js/patients.js' %}"></script>
+<script src="{% static 'rtstructcompare/js/loading_spinner.js' %}"></script>
 {% endblock %}
 
 {% block content %}
+{% include "utils/loading_spinner.html" %}
 <div class="patient-page">
     <div class="patient-list-container">
         <div class="page-header">
@@ -156,7 +159,7 @@
 
                     <div>
                         <div>
-                            <a href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}" class="btn-compare {% if patient_data.feedback_status == 'done' %}btn-done{% elif patient_data.feedback_status == 'pending' %}btn-review{% endif %}" style="height: 100%;">
+                            <a href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}" class="btn-compare {% if patient_data.feedback_status == 'done' %}btn-done{% elif patient_data.feedback_status == 'pending' %}btn-review{% endif %}" style="height: 100%;" onclick="if(window.Loader) window.Loader.show();">
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 1.25rem; height: 1.25rem;">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
