@@ -168,8 +168,10 @@ async function displaySlice() {
     const sliceSlider = document.getElementById('sliceSlider');
     if (sliceSlider) sliceSlider.value = currentSliceIndex;
     updateSliceInfo();
-    displayCTSlice(ctx1, canvas1CssWidth, canvas1CssHeight, ctData[currentSliceIndex], zoomLevel1, panOffset1);
-    displayCTSlice(ctx2, canvas2CssWidth, canvas2CssHeight, ctData[currentSliceIndex], zoomLevel2, panOffset2);
+    await Promise.all([
+        displayCTSlice(ctx1, canvas1CssWidth, canvas1CssHeight, ctData[currentSliceIndex], zoomLevel1, panOffset1),
+        displayCTSlice(ctx2, canvas2CssWidth, canvas2CssHeight, ctData[currentSliceIndex], zoomLevel2, panOffset2)
+    ]);
 
     drawROIOverlays(ctx1, canvas1CssWidth, canvas1CssHeight, rt1Contours, ctData[currentSliceIndex], zoomLevel1, panOffset1);
     drawROIOverlays(ctx2, canvas2CssWidth, canvas2CssHeight, rt2Contours, ctData[currentSliceIndex], zoomLevel2, panOffset2);
@@ -416,32 +418,27 @@ function drawROIOverlays(ctx, canvasWidth, canvasHeight, rtstructContours, curre
                 const x = point[0];
                 const y = point[1];
 
-                const pixelX = (x - imagePosition[0]) / pixelSpacing[0];
-                const pixelY = (y - imagePosition[1]) / pixelSpacing[1];
+                const pixelX = (x - imagePosition[0]) / pixelSpacing[1];
+                const pixelY = (y - imagePosition[1]) / pixelSpacing[0];
 
                 const screenX = baseX + (pixelX * scale);
                 const screenY = baseY + (pixelY * scale);
                 return [screenX, screenY];
             });
 
-            const validPoints = points2D.filter((point) =>
-                point[0] >= 0 && point[0] <= canvasWidth &&
-                point[1] >= 0 && point[1] <= canvasHeight,
-            );
-
-            if (validPoints.length >= 3) {
+            if (points2D.length >= 3) {
                 ctx.beginPath();
-                ctx.moveTo(validPoints[0][0], validPoints[0][1]);
-                for (let i = 1; i < validPoints.length; i += 1) {
-                    ctx.lineTo(validPoints[i][0], validPoints[i][1]);
+                ctx.moveTo(points2D[0][0], points2D[0][1]);
+                for (let i = 1; i < points2D.length; i += 1) {
+                    ctx.lineTo(points2D[i][0], points2D[i][1]);
                 }
                 ctx.closePath();
                 ctx.stroke();
 
                 ctx.fillStyle = color;
                 ctx.font = '12px Arial';
-                const labelX = validPoints[0][0];
-                const labelY = Math.max(10, validPoints[0][1] - 5);
+                const labelX = points2D[0][0];
+                const labelY = Math.max(10, points2D[0][1] - 5);
                 ctx.fillText(roiName, labelX, labelY);
             }
         });
