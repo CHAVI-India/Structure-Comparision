@@ -1,139 +1,226 @@
 <!-- ROI Ratings -->
-<div class="bg-white rounded-lg shadow-md p-4 mb-6">
-    <div class="flex justify-between items-center">
-        <h3 class="text-xl font-semibold mb-3">ROI Structure Ratings</h3>
-        <button class="px-3 py-1 rounded-full bg-emerald-50 text-sm text-emerald-700 border border-emerald-100 hover:bg-teal-600 hover:text-teal-100 transition">
-            <a href="{% url 'patients' %}">Go To Patient Page</a>
-        </button>
-    </div>
-    <p class="text-sm text-gray-600 mb-4">Rate each structure from 1 to 10 for both RTSTRUCTs.</p>
-    <div id="roiRatingStatus" class="text-sm mb-3 text-gray-600"></div>
-    <div class="mb-4 grid gap-2 text-xs text-gray-500">
-        <div class="flex flex-wrap gap-2">
-            <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">9-10 Excellent</span>
-            <span class="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">7-8 Very good</span>
-            <span class="px-2 py-1 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-100">5-6 Good</span>
-            <span class="px-2 py-1 rounded-full bg-orange-50 text-orange-700 border border-orange-100">3-4 Fair</span>
-            <span class="px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-100">1-2 Needs work</span>
+<div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 md:p-7 mb-6">
+    <div
+        class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-gray-100 pb-5">
+        <div>
+            <h3 class="text-2xl font-bold text-gray-800 tracking-tight">ROI Structure Ratings</h3>
+            <p class="text-sm text-gray-500 mt-1">Rate the quality of each structure from 1 to 10 for both RTSTRUCTs.
+            </p>
         </div>
+        <a href="{% url 'patients' %}"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 font-medium text-sm transition-colors focus:ring-2 focus:ring-offset-1 focus:ring-emerald-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Go To Patient Page
+        </a>
     </div>
-    <div class="flex flex-col md:flex-row md:items-end gap-3 mb-4">
-        <div class="w-full md:w-1/2">
-            <label for="roiSearchFilter" class="block text-xs font-medium text-gray-600 mb-1">Search ROI</label>
-            <div class="flex items-stretch gap-2">
+
+    <div id="roiRatingStatus" class="text-sm mb-4 text-gray-600"></div>
+
+    <!-- Legend -->
+    <div class="mb-5 flex flex-wrap gap-2 text-xs font-medium">
+        <div class="rating-tag rating-tag-10">10 <span>Outstanding</span></div>
+        <div class="rating-tag rating-tag-9">9 <span>Excellent</span></div>
+        <div class="rating-tag rating-tag-8">8 <span>Very good</span></div>
+        <div class="rating-tag rating-tag-7">7 <span>Good</span></div>
+        <div class="rating-tag rating-tag-6">6 <span>Above Average</span></div>
+        <div class="rating-tag rating-tag-5">5 <span>Average</span></div>
+        <div class="rating-tag rating-tag-4">4 <span>Below Average</span></div>
+        <div class="rating-tag rating-tag-3">3 <span>Weak</span></div>
+        <div class="rating-tag rating-tag-2">2 <span>Very Weak</span></div>
+        <div class="rating-tag rating-tag-1">1 <span>Poor</span></div>
+    </div>
+
+    <!-- Controls -->
+    <div
+        class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-5 bg-gray-50/80 p-4 rounded-xl border border-gray-100">
+        <div class="w-full md:w-96">
+            <label for="roiSearchFilter"
+                class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Search ROI</label>
+            <div class="relative flex items-center">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
                 <input id="roiSearchFilter" type="text"
-                    class="w-2/4 border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300"
+                    class="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-l-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm"
                     placeholder="Type to filter ROI names..." autocomplete="off">
                 <button id="roiSearchClearBtn" type="button"
-                    class="px-4 py-2 border border-gray-200 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition whitespace-nowrap">
+                    class="px-4 py-2 border border-l-0 border-gray-200 bg-white rounded-r-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium transition-colors shadow-sm">
                     Clear
                 </button>
             </div>
         </div>
-        <div class="flex-1 flex items-end justify-end">
+        <div class="flex-shrink-0">
             <button id="clearAllRatingsBtn" type="button"
-                class="px-6 py-2 border border-rose-200 bg-rose-50 text-rose-700 rounded-md text-sm font-medium hover:bg-rose-100 transition whitespace-nowrap">
+                class="inline-flex items-center gap-2 px-5 py-2 border border-rose-200 bg-rose-50 text-rose-600 rounded-lg text-sm font-medium hover:bg-rose-100 hover:text-rose-700 transition-colors shadow-sm focus:ring-2 focus:ring-offset-2 focus:ring-rose-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
                 Reset Ratings
             </button>
         </div>
     </div>
-    <div class="overflow-x-auto rounded border border-gray-200">
-        <table class="w-full min-w-[640px] text-sm" id="roiRatingTable">
+
+    <!-- Table -->
+    <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-sm ring-1 ring-black ring-opacity-5">
+        <table class="w-full min-w-[850px] text-sm text-gray-700" id="roiRatingTable">
             <caption class="sr-only">ROI rating controls for RTSTRUCT comparison</caption>
-            <thead>
-                <tr class="border-b bg-gray-50">
-                    <th scope="col" class="text-left py-2 px-2 font-semibold">ROI Name</th>
-                    <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt1_label|default:'RTSTRUCT 1' }}">RT1: {{ rt1_label|default:'RTSTRUCT 1'|truncatechars:30 }}</th>
-                    <th scope="col" class="text-center py-2 px-2 font-semibold" title="{{ rt2_label|default:'RTSTRUCT 2' }}">RT2: {{ rt2_label|default:'RTSTRUCT 2'|truncatechars:30 }}</th>
-                    <th scope="col" class="text-center py-2 px-2 font-semibold">Comment</th>
-                    <th scope="col" class="text-center py-2 px-2 font-semibold">Submit Rating</th>
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th scope="col"
+                        class="text-left py-3.5 px-4 font-semibold text-gray-600 uppercase tracking-wider text-xs w-64">
+                        ROI Name</th>
+                    <th scope="col"
+                        class="text-center py-3.5 px-4 font-semibold text-gray-600 uppercase tracking-wider text-xs"
+                        title="{{ rt1_label|default:'RTSTRUCT 1' }}">
+                        <span
+                            class="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
+                            RT1: {{ rt1_label|default:'RTSTRUCT 1'|truncatechars:25 }}
+                        </span>
+                    </th>
+                    <th scope="col"
+                        class="text-center py-3.5 px-4 font-semibold text-gray-600 uppercase tracking-wider text-xs"
+                        title="{{ rt2_label|default:'RTSTRUCT 2' }}">
+                        <span
+                            class="inline-flex items-center gap-1.5 justify-center px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            RT2: {{ rt2_label|default:'RTSTRUCT 2'|truncatechars:25 }}
+                        </span>
+                    </th>
+                    <th scope="col"
+                        class="text-center py-3.5 px-3 font-semibold text-gray-600 uppercase tracking-wider text-xs w-24">
+                        Comment</th>
+                    <th scope="col"
+                        class="text-center py-3.5 px-4 font-semibold text-gray-600 uppercase tracking-wider text-xs w-32">
+                        Action</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-gray-100 bg-white">
                 {% for structure in common_structures %}
-                <tr class="border-b hover:bg-gray-50" data-roi-name="{{ structure }}">
-                    <th scope="row" class="py-2 px-2 font-medium text-left">{{ structure }}</th>
-                    <td class="p-2 text-center">
+                <tr class="hover:bg-indigo-50/40 transition-colors duration-150 group" data-roi-name="{{ structure }}">
+                    <th scope="row" class="py-4 px-4 font-medium text-gray-900 border-r border-gray-50 text-left">
+                        {{ structure }}
+                    </th>
+                    <td class="p-3 text-center align-middle border-r border-gray-50">
                         <div class="rating-control">
-                            <div class="flex justify-center gap-4">
-                                <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 1">
+                            <div class="flex justify-center gap-2 lg:gap-4 items-center flex-col xl:flex-row">
+                                <div class="rating-row justify-center gap-0.5 rating-stars"
+                                    aria-label="Rate RTSTRUCT 1">
                                     {% for star in '1234567890'|make_list %}
-                                    <label class="inline-flex flex-col items-center text-xs">
-                                        <input type="radio" class="hidden roi-rating-r1 roi-rating-star" name="roi-rating-r1-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
-                                            data-roi-name="{{ structure }}"
+                                    <label class="inline-flex flex-col items-center text-xs group/star cursor-pointer">
+                                        <input type="radio" class="hidden roi-rating-r1 roi-rating-star"
+                                            name="roi-rating-r1-{{ forloop.parentloop.counter0 }}"
+                                            value="{{ forloop.counter }}" data-roi-name="{{ structure }}"
                                             data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r1"
                                             aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r1">
-                                        <span class="text-xl select-none star-icon">★</span>
+                                        <span
+                                            class="text-xl leading-none select-none star-icon transition-transform group-hover/star:scale-125 group-hover/star:text-indigo-400">★</span>
                                     </label>
                                     {% endfor %}
                                 </div>
-                                <div class="flex items-center justify-center gap-2 mt-1 text-sm">
-                                    <span id="rating-display-{{ forloop.counter0 }}-r1" class="rating-display" aria-live="polite">Not rated</span>
+                                <div class="flex items-center justify-center mt-1 xl:mt-0">
+                                    <span id="rating-display-{{ forloop.counter0 }}-r1"
+                                        class="rating-display whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded shadow-sm bg-gray-100 text-gray-600 border border-gray-200"
+                                        aria-live="polite">Not rated</span>
                                 </div>
                             </div>
                         </div>
                     </td>
-                    <td class="p-2 text-center">
+                    <td class="p-3 text-center align-middle border-r border-gray-50">
                         <div class="rating-control">
-                            <div class="flex justify-center gap-4">
-                                <div class="rating-row justify-center gap-1 rating-stars" aria-label="Rate RTSTRUCT 2">
+                            <div class="flex justify-center gap-2 lg:gap-4 items-center flex-col xl:flex-row">
+                                <div class="rating-row justify-center gap-0.5 rating-stars"
+                                    aria-label="Rate RTSTRUCT 2">
                                     {% for star in '1234567890'|make_list %}
-                                    <label class="inline-flex flex-col items-center text-xs">
-                                        <input type="radio" class="hidden roi-rating-r2 roi-rating-star" name="roi-rating-r2-{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter }}"
-                                            data-roi-name="{{ structure }}"
+                                    <label class="inline-flex flex-col items-center text-xs group/star cursor-pointer">
+                                        <input type="radio" class="hidden roi-rating-r2 roi-rating-star"
+                                            name="roi-rating-r2-{{ forloop.parentloop.counter0 }}"
+                                            value="{{ forloop.counter }}" data-roi-name="{{ structure }}"
                                             data-rating-value-id="rating-value-{{ forloop.parentloop.counter0 }}-r2"
                                             aria-describedby="rating-display-{{ forloop.parentloop.counter0 }}-r2">
-                                        <span class="text-xl select-none star-icon">★</span>
+                                        <span
+                                            class="text-xl leading-none select-none star-icon transition-transform group-hover/star:scale-125 group-hover/star:text-emerald-400">★</span>
                                     </label>
                                     {% endfor %}
                                 </div>
-                                <div class="flex items-center justify-center gap-2 mt-1 text-sm">
-                                    <span id="rating-display-{{ forloop.counter0 }}-r2" class="rating-display" aria-live="polite">Not rated</span>
+                                <div class="flex items-center justify-center mt-1 xl:mt-0">
+                                    <span id="rating-display-{{ forloop.counter0 }}-r2"
+                                        class="rating-display whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded shadow-sm bg-gray-100 text-gray-600 border border-gray-200"
+                                        aria-live="polite">Not rated</span>
                                 </div>
                             </div>
                         </div>
                     </td>
-                    <td class="py-2 px-2 text-center">
+                    <td class="py-3 px-3 text-center align-middle">
                         <button type="button"
-                            class="roi-comment-btn px-2 py-1 text-xs border rounded hover:bg-gray-100 transition"
-                            data-roi-name="{{ structure }}"
-                            aria-label="Add comment for {{ structure }}"
-                            title="Add comment">
-                            💬
+                            class="roi-comment-btn inline-flex items-center justify-center w-9 h-9 mx-auto rounded-full bg-white border border-gray-200 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            data-roi-name="{{ structure }}" aria-label="Add comment for {{ structure }}"
+                            title="Add/Edit comment">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                            </svg>
                         </button>
                     </td>
-                    <td class="py-2 px-2 text-center">
-                        <div class="flex flex-col items-center gap-1">
+                    <td class="py-3 px-4 text-center align-middle">
+                        <div class="flex flex-col items-center gap-1.5 w-full">
                             <button type="button"
-                                class="roi-submit-btn px-3 py-1 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
-                                data-roi-name="{{ structure }}"
-                                aria-label="Submit rating for {{ structure }}">
+                                class="roi-submit-btn w-full px-4 py-1.5 text-xs font-semibold tracking-wide bg-indigo-600 text-white rounded-full hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
+                                data-roi-name="{{ structure }}" aria-label="Submit rating for {{ structure }}">
                                 Submit
                             </button>
-                            <span class="roi-submit-status text-xs text-gray-500" data-roi-name="{{ structure }}"></span>
+                            <span
+                                class="roi-submit-status text-[11px] font-medium text-gray-500 empty:hidden min-h-[16px]"
+                                data-roi-name="{{ structure }}"></span>
                         </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <div class="px-3 py-3 bg-gray-50 border-t border-gray-200">
-            <span id="submitRatingStatus" class="text-sm text-gray-600"></span>
+        <!-- Submit Status Footer -->
+        <div class="px-5 py-3.5 bg-gray-50/80 border-t border-gray-200 flex items-center justify-between">
+            <span id="submitRatingStatus" class="text-sm font-medium text-gray-600"></span>
+            <span class="text-xs text-gray-400">Select ratings for both RTSTRUCTs to submit</span>
         </div>
     </div>
 </div>
 
 <!-- Comment Modal -->
-<div id="commentModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-40">
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
-        <h4 class="text-md font-semibold mb-1">Comment for <span id="commentModalRoiName"></span></h4>
+<div id="commentModal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900 bg-opacity-60 backdrop-blur-sm transition-opacity">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 transform transition-all">
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                Comment for <span id="commentModalRoiName"
+                    class="text-indigo-600 break-words max-w-[200px] truncate ml-1"></span>
+            </h4>
+        </div>
         <textarea id="commentModalText" rows="4"
-            class="w-full border rounded p-2 text-sm mt-2 resize-none" placeholder="Enter your comment..."></textarea>
-        <div class="mt-3 flex justify-end gap-2">
+            class="w-full border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none shadow-inner bg-gray-50/50"
+            placeholder="Enter your specific observations or feedback here..."></textarea>
+        <div class="mt-5 flex justify-end gap-3">
             <button type="button" id="commentModalCancel"
-                class="px-4 py-2 border rounded text-sm hover:bg-gray-100 transition">Cancel</button>
+                class="px-5 py-2 mt-1 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 hover:text-gray-900 transition-colors focus:ring-2 focus:ring-offset-1 focus:ring-gray-200 shadow-sm">
+                Cancel
+            </button>
             <button type="button" id="commentModalSave"
-                class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700 transition">Save</button>
+                class="px-5 py-2 mt-1 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5 focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500">
+                Save Comment
+            </button>
         </div>
     </div>
 </div>
