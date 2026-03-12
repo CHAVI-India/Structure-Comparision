@@ -17,7 +17,17 @@
 <body class="bg-gray-100 px-4 md:px-6 py-4 md:py-6">
     {% include "utils/loading_spinner.html" %}
     <div class="mx-auto w-full max-w-[90vw] p-6">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6">RTSTRUCT Comparison & Ratings</h1>
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-6">RTSTRUCT Comparison & Ratings</h1>
+            <a href="{% url 'patients' %}"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:text-emerald-800 font-medium text-sm transition-colors focus:ring-2 focus:ring-offset-1 focus:ring-emerald-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Go To Patient Page
+            </a>
+        </div>
         <!-- Patient Info -->
         <div class="bg-white rounded-lg shadow-md p-4 mb-6">
             <h2 class="text-xl font-semibold mb-3">Patient Information</h2>

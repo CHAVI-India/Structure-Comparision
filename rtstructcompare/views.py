@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-
+import os
 import json
 import shutil
 from pathlib import Path
@@ -61,7 +61,8 @@ from .services.feedback_query_service import (
     parse_feedback_list_params,
 )
 from .services.patient_context_service import build_patient_context, is_admin_user
-
+from .services.bulk_invite_service import BulkInviteService
+from user.models import UserProfile, UserTypeChoices
 
 logger = logging.getLogger(__name__)
 STATUS_MESSAGE_TIMEOUT_MS = 10000
@@ -713,6 +714,7 @@ def submit_feedback(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def submit_user_details(request):
+
     """Save user profile details from the viewer modal."""
     if not request.user.is_authenticated:
         return JsonResponse({'success': False, 'error': 'Authentication required'}, status=401)
@@ -742,3 +744,120 @@ def submit_user_details(request):
         return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+# ─── Bulk Invite Users ────────────────────────────────────────────────────────
+
+_DEFAULT_INVITE_BODY = """Thank you for agreeing to be a part of the segmentation comparison study. To provide some background, we are testing two automatic segmentation models using different loss functions. This work is being conducted in collaboration with the Indian Institute of Technology Kharagpur.
+
+Your Username: {username}
+Your Password:  {password}
+
+Please follow the following steps to participate in the process
+
+1. First, go to the website https://compare.chavi.ai
+2. Log in by clicking on the Login button on the front page or on the top right of the navigation bar using the username and password provided above
+3. After logging in, you will go to the patient page, where you will see 5 patients for whom the rating has to be provided.
+4. Click on any patient you want to rate first.
+5. A new page will open (it will take some time depending on the network speed so please be patient).
+6. First, the system will ask you to provide details about your experience and familiarity with autosegmentation systems.
+7. Then you will see two CT images side by side. Please make a note of the name of the image series.
+8. Scroll down, and you will be able to toggle the two regions of interest, which have been segmented - Brachial Plexus Left and Brachial Plexus Right.
+9. Please go through the images (see the attached manual), slice by slice, and review the contours.
+10. Please rate the contour with a higher star rating to indicate better contour quality.
+11. Click the submit button to save your rating.
+12. If you have any comments, please provide them in the comment box.
+
+Once you have rated all the 5 patients, you can log out of the system.
+We would like to thank you for your time and effort.
+Kindly ensure that you are using a desktop/laptop to do the rating for the best experience.
+
+Thanking You
+Sincerely Yours,
+Santam Chakraborty
+On behalf of the DRAW Autosegmentation Team."""
+
+_DEFAULT_INVITE_SUBJECT = "Invitation to the Segmentation Comparison Study"
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def bulk_invite_users(request):
+    """Admin-only view: bulk-create users and send personalised invitation emails."""
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden("Admin access required.")
+
+    # ── Handle POST: Process the invitation ──────────────────────────────────
+    if request.method == "POST":
+        first_names = request.POST.getlist("first_name[]")
+        last_names  = request.POST.getlist("last_name[]")
+        usernames   = request.POST.getlist("username[]")
+        emails      = request.POST.getlist("email[]")
+
+        subject = request.POST.get("subject", _DEFAULT_INVITE_SUBJECT).strip() or _DEFAULT_INVITE_SUBJECT
+        body    = request.POST.get("body",    _DEFAULT_INVITE_BODY).strip()    or _DEFAULT_INVITE_BODY
+
+        recipients = []
+        for f, l, u, e in zip(first_names, last_names, usernames, emails):
+            if f.strip() or e.strip():
+                recipients.append({
+                    "first_name": f.strip(),
+                    "last_name":  l.strip(),
+                    "username":   u.strip(),
+                    "email":      e.strip()
+                })
+        
+        if recipients:
+            results = BulkInviteService.process_bulk_invite(recipients, subject, body)
+            
+            # Store results in session so they survive the redirect (Standard PRG Pattern)
+            request.session['bulk_invite_results'] = results
+            
+            # Use messages framework for the status alert
+            status_msg = f"Done: {results['sent_count']} sent, {results['skipped_count']} skipped, {results['error_count']} failed."
+            if results['sent_count'] > 0:
+                messages.success(request, status_msg)
+            else:
+                messages.error(request, status_msg)
+        else:
+            messages.error(request, "No valid recipients provided.")
+            # Store the rows so they aren't lost on form validation error
+            request.session['bulk_invite_post_rows'] = [
+                {"first_name": f, "last_name": l, "username": u, "email": e}
+                for f, l, u, e in zip(first_names, last_names, usernames, emails)
+            ]
+
+        return redirect('bulk_invite_users')
+
+    # ── Handle GET: Display form / results ───────────────────────────────────
+    # Pull data from session if this is a redirect after a POST
+    results_data = request.session.pop('bulk_invite_results', {})
+    post_rows    = request.session.pop('bulk_invite_post_rows', [])
+
+    context = {
+        "default_body":  _DEFAULT_INVITE_BODY,
+        "subject":       _DEFAULT_INVITE_SUBJECT,
+        "body":          _DEFAULT_INVITE_BODY,
+        "results":       results_data.get('results'),
+        "sent_count":    results_data.get('sent_count', 0),
+        "skipped_count": results_data.get('skipped_count', 0),
+        "error_count":   results_data.get('error_count', 0),
+        "post_rows":     post_rows,
+    }
+
+    return render(request, "bulk_invite.html", context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def test_email_connection(request):
+    """Admin-only view: test SMTP connection through BulkInviteService."""
+    if not is_admin_user(request.user):
+        return JsonResponse({"success": False, "error": "Admin access required."}, status=403)
+
+    to_email = (request.user.email or "").strip()
+    if not to_email:
+        return JsonResponse({"success": False, "error": "Your admin account has no email set."})
+
+    success, msg = BulkInviteService.test_smtp_connection(to_email)
+    return JsonResponse({"success": success, "message": msg})
