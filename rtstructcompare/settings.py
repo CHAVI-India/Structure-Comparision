@@ -16,17 +16,14 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env if present
-load_dotenv(BASE_DIR / '.env', override=True)  # override=True ensures .env always wins over OS env
+# Load environment variables from .env
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = 'django-insecure-czbblxa)dgq0kr^u7qv6pq-+=oas6zs876)*__ko*$&ceefqa0'
 
 DEBUG = True
 
 ALLOWED_HOSTS = ['52.66.17.8', 'localhost', 'compare.chavi.ai']
-
-
-# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -69,10 +66,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'rtstructcompare.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -83,10 +76,6 @@ DATABASES = {
         'PORT': '5432',
     }
 }
-
-
-# Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -103,10 +92,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
@@ -117,17 +102,12 @@ USE_TZ = True
 
 LOGIN_URL = '/login/'
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# AWS / S3 configuration for DICOM storage
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
@@ -138,9 +118,7 @@ AWS_S3_FILE_OVERWRITE = os.getenv('AWS_S3_FILE_OVERWRITE', False)
 DICOM_S3_PREFIX = os.getenv('DICOM_S3_PREFIX', 'dicom_uploads')
 
 DICOM_STORAGE_ROOT = Path(MEDIA_ROOT / 'dicom_files')
-print(f"[env check] AWS_ACCESS_KEY_ID: {AWS_ACCESS_KEY_ID}, AWS_STORAGE_BUCKET_NAME: {AWS_STORAGE_BUCKET_NAME}, AWS_SECRET_ACCESS_KEY: {AWS_SECRET_ACCESS_KEY}, AWS_S3_REGION_NAME: {AWS_S3_REGION_NAME}, AWS_S3_SIGNATURE_VERSION: {AWS_S3_SIGNATURE_VERSION}, AWS_DEFAULT_ACL: {AWS_DEFAULT_ACL}, AWS_S3_FILE_OVERWRITE: {AWS_S3_FILE_OVERWRITE}, DICOM_S3_PREFIX: {DICOM_S3_PREFIX}")
 
-# File upload limits (10 GB)
 TEN_GB = 10 * 1024 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = TEN_GB
 FILE_UPLOAD_MAX_MEMORY_SIZE = TEN_GB
