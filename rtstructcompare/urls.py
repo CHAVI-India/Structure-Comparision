@@ -18,7 +18,11 @@ urlpatterns = [
     path('admin/dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('admin/dashboard/charts/', views.admin_dashboard_charts, name='admin_dashboard_charts'),
     path('admin/assignments/', views.admin_assignments, name='admin_assignments'),
+    path('admin/bulk-invite/', views.bulk_invite_users, name='bulk_invite_users'),
+    path('admin/bulk-invite/test-connection/', views.test_email_connection, name='test_email_connection'),
     path('admin/', admin.site.urls),
+
+
     path('import/', views.dicom_import, name='dicom_import'),
 
     path('user/dashboard/', views.user_dashboard, name='user_dashboard'),

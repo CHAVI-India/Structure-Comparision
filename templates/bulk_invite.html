@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Bulk Invite Users — Structure Comparison{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'rtstructcompare/css/bulk_invite.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="invite-container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+      <div>
+        <h1>✉️ Bulk User Invite</h1>
+        <p>Create accounts &amp; send personalised invitation emails to multiple raters in one step.</p>
+      </div>
+      <form id="test-form" method="post" action="{% url 'test_email_connection' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-test" id="btn-test">
+          <span id="test-icon">🔌</span> Test SMTP Connection
+        </button>
+      </form>
+    </div>
+    <div id="test-result" class="test-result"></div>
+  </div>
+
+  <!-- Alerts from previous POST (PRG Pattern) -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %} status-auto-hide" style="transition: opacity 0.8s ease-out;">
+        <span class="alert-icon">{% if message.tags == 'success' %}✅{% else %}❌{% endif %}</span>
+        <span>{{ message }}</span>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Results table after send -->
+  {% if results %}
+  <div class="card">
+    <div class="card-title">📋 Send Report</div>
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Username</th>
+          <th>Status</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ r.name }}</td>
+          <td>{{ r.email }}</td>
+          <td>{{ r.username }}</td>
+          <td>
+            {% if r.status == 'sent' %}
+              <span class="status-ok">✓ Sent</span>
+            {% elif r.status == 'skipped' %}
+              <span class="status-skip">⚠ Skipped</span>
+            {% else %}
+              <span class="status-err">✗ Error</span>
+            {% endif %}
+          </td>
+          <td>{{ r.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:16px; font-size:0.88rem; color:var(--slate-600);">
+      Sent: <strong>{{ sent_count }}</strong> &nbsp;|&nbsp;
+      Skipped: <strong>{{ skipped_count }}</strong> &nbsp;|&nbsp;
+      Errors: <strong>{{ error_count }}</strong>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="invite-form" novalidate>
+    {% csrf_token %}
+
+    <!-- Step 1: Recipients -->
+    <div class="card">
+      <div class="card-title">
+        <span class="step-badge">1</span>
+        Recipients
+      </div>
+
+      <div class="recipients-header">
+        <span>#</span>
+        <span>First Name</span>
+        <span>Last Name</span>
+        <span>Username</span>
+        <span>Email Address</span>
+        <span></span>
+      </div>
+
+      <div class="recipient-rows" id="recipient-rows">
+        <!-- Rows injected by JS / re-populated from POST errors -->
+        {% if post_rows %}
+          {% for row in post_rows %}
+          <div class="recipient-row">
+            <span class="row-number">{{ forloop.counter }}</span>
+            <input type="text"  name="first_name[]" placeholder="First Name" value="{{ row.first_name }}" autocomplete="off">
+            <input type="text"  name="last_name[]"  placeholder="Last Name"  value="{{ row.last_name }}" autocomplete="off">
+            <input type="text"  name="username[]"   placeholder="Username"   value="{{ row.username }}" autocomplete="off">
+            <input type="email" name="email[]"      placeholder="Email"      value="{{ row.email }}" autocomplete="off">
+            <button class="delete-row-btn" type="button" title="Remove row">🗑</button>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+
+      <div class="row-controls">
+        <button type="button" class="btn-add-row" id="btn-add-rows">
+          <span>＋ Add</span>
+          <input class="add-count-input" type="number" id="add-count" value="5" min="1" max="50" onclick="event.stopPropagation()">
+          <span>rows</span>
+        </button>
+        <button type="button" class="btn-add-row" id="btn-clear-empty" style="border-color:#94a3b8; color:#475569; background:#f8fafc;">
+          🧹 Clear empty
+        </button>
+      </div>
+      <p class="hint">* Existing users (same email) will be skipped — no duplicate accounts created.</p>
+    </div>
+
+    <!-- Step 2: Email Content -->
+    <div class="card">
+      <div class="card-title">
+        <span class="step-badge">2</span>
+        Email Content
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label class="form-label" for="id-subject">Subject Line</label>
+        <input id="id-subject" class="form-input" type="text" name="subject"
+               value="{{ subject|default:'Invitation for rating to the Segmentation Comparison' }}"
+               placeholder="Email subject…" required>
+      </div>
+
+      <div>
+        <label class="form-label" for="id-body">
+          Body — <em style="text-transform:none; font-weight:400; color:#94a3b8;">use <code>{name}</code>, <code>{username}</code>, <code>{password}</code> as placeholders</em>
+        </label>
+        <textarea id="id-body" class="form-input" name="body" rows="18" required
+                  oninput="updatePreview()">{{ body }}</textarea>
+        <p class="hint">The greeting "Dear &lt;Name&gt;," is automatically prepended. The placeholders <code>{username}</code> and <code>{password}</code> will be substituted per recipient.</p>
+      </div>
+    </div>
+
+    <!-- Step 3: Preview -->
+    <div class="card">
+      <div class="card-title">
+        <span class="step-badge">3</span>
+        Live Preview
+      </div>
+      <div class="preview-header">
+        <span class="preview-label">How the email will look (first recipient)</span>
+      </div>
+      <div class="preview-box" id="preview-box">Loading…</div>
+    </div>
+
+    <!-- Submit -->
+    <div style="display:flex; justify-content:flex-end; padding-bottom:40px;">
+      <button type="submit" class="btn-submit" id="btn-submit">
+        <span id="btn-icon">🚀</span>
+        <span id="btn-text">Create Users &amp; Send Emails</span>
+      </button>
+    </div>
+
+  </form>
+</div>
+
+{% block extra_js %}
+<script src="{% static 'rtstructcompare/js/bulk_invite.js' %}"></script>
+{% endblock %}
+{% endblock %}
