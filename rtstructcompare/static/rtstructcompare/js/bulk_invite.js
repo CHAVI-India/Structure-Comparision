@@ -45,9 +45,9 @@ function addRows(n) {
 
 // ── Live Preview ────────────────────────────────────────────────────────────
 const DEFAULT_PREVIEW = {
-  name: 'John',
-  username: 'john.doe',
-  password: 'Xk9#mP2qL'
+  name: 'Santam',
+  username: '*******',
+  password: '*******'
 };
 
 function updatePreview() {
@@ -69,9 +69,9 @@ function updatePreview() {
   const previewUser = (userHandleInput && userHandleInput.value) || DEFAULT_PREVIEW.username;
 
   let rendered = `Subject: ${subject}\n\n`;
-  rendered += `Dear ${firstName},\n\n`;
+  rendered += `Dear Dr. ${firstName},\n\n`;
   rendered += body
-    .replace(/\{name\}/g,     firstName)
+    .replace(/\{name\}/g,     `Dr. ${firstName}`)
     .replace(/\{username\}/g, previewUser)
     .replace(/\{password\}/g, DEFAULT_PREVIEW.password);
 

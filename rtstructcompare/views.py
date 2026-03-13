@@ -772,7 +772,8 @@ Once you have rated all the 5 patients, you can log out of the system.
 We would like to thank you for your time and effort.
 Kindly ensure that you are using a desktop/laptop to do the rating for the best experience.
 
-Thanking You
+Thanking You,
+
 Sincerely Yours,
 Santam Chakraborty
 On behalf of the DRAW Autosegmentation Team."""
