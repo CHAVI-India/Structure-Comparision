@@ -82,7 +82,7 @@ class BulkInviteService:
                 # 3. Personalise Email
                 # We use first_name for the greeting
                 email_body = (
-                    f"Dear {first_name},\n\n"
+                    f"Dear Dr. {first_name},\n\n"
                     + body.replace("{name}", first_name).replace("{username}", username).replace("{password}", password)
                 )
 
