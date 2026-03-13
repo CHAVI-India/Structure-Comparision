@@ -19,23 +19,44 @@
 
     <div id="roiRatingStatus" class="text-sm mb-4 text-gray-600"></div>
 
-    <!-- Legend -->
-    <div class="mb-5 flex flex-wrap gap-2 text-xs font-medium">
-        <div class="rating-tag rating-tag-10">10 <span>Outstanding</span></div>
-        <div class="rating-tag rating-tag-9">9 <span>Excellent</span></div>
-        <div class="rating-tag rating-tag-8">8 <span>Very good</span></div>
-        <div class="rating-tag rating-tag-7">7 <span>Good</span></div>
-        <div class="rating-tag rating-tag-6">6 <span>Above Average</span></div>
-        <div class="rating-tag rating-tag-5">5 <span>Average</span></div>
-        <div class="rating-tag rating-tag-4">4 <span>Below Average</span></div>
-        <div class="rating-tag rating-tag-3">3 <span>Weak</span></div>
-        <div class="rating-tag rating-tag-2">2 <span>Very Weak</span></div>
-        <div class="rating-tag rating-tag-1">1 <span>Poor</span></div>
+    <!-- Rating Legend -->
+    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Rating Scale Guide</h4>
+    <div class="space-y-2.5 py-3 pl-3 pr-6 bg-white/50 rounded-2xl border border-slate-100 max-w-fit">
+        <!-- Row 1: Poor -->
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-0.5">
+                <span class="text-xl text-orange-400 drop-shadow-sm">★</span>
+                {% for i in "123456789"|make_list %}
+                <span class="text-xl text-slate-200">★</span>
+                {% endfor %}
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="px-6 py-1 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-600 shadow-sm min-w-[70px] text-center">
+                    1/10
+                </div>
+                <span class="text-[10px] font-black text-rose-500 uppercase tracking-widest">Very Poor (Worst Case)</span>
+            </div>
+        </div>
+
+        <!-- Row 2: Outstanding -->
+        <div class="flex items-center gap-6 pt-2 border-t border-slate-100">
+            <div class="flex items-center gap-0.5">
+                {% for i in "1234567890"|make_list %}
+                <span class="text-xl text-orange-400 drop-shadow-sm">★</span>
+                {% endfor %}
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="px-6 py-1 bg-slate-50 border border-slate-200 rounded-md text-sm font-bold text-slate-600 shadow-sm min-w-[70px] text-center">
+                    10/10
+                </div>
+                <span class="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Very Good (Best Case)</span>
+            </div>
+        </div>
     </div>
 
     <!-- Controls -->
     <div
-        class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-5 bg-gray-50/80 p-4 rounded-xl border border-gray-100">
+        class="flex flex-col md:flex-row md:items-end justify-end gap-4 mb-5 bg-gray-50/80 rounded-xl border border-gray-100">
         <div class="w-full md:w-96">
             <label for="roiSearchFilter"
                 class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Search ROI</label>
@@ -48,7 +69,7 @@
                     </svg>
                 </div>
                 <input id="roiSearchFilter" type="text"
-                    class="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-l-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm"
+                    class="block w-full pl-9 py-2 border border-gray-200 rounded-l-lg text-sm bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all shadow-sm"
                     placeholder="Type to filter ROI names..." autocomplete="off">
                 <button id="roiSearchClearBtn" type="button"
                     class="px-4 py-2 border border-l-0 border-gray-200 bg-white rounded-r-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium transition-colors shadow-sm">

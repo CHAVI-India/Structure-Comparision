@@ -33,12 +33,22 @@ class BulkInviteService:
                 return pwd
 
     @classmethod
-    def process_bulk_invite(cls, recipients, subject, body):
+    def process_bulk_invite(cls, recipients, subject, body, attachment=None):
         results = []
         sent_count = 0
         skipped_count = 0
         error_count = 0
-        from_email = settings.DEFAULT_FROM_EMAIL
+        # Force use of the confirmed sender address
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "TMCKolkata DRAW Team <noreply@compare.chavi.ai>")
+
+        # Pre-read attachment data if provided
+        attachment_data = None
+        if attachment:
+            attachment_data = {
+                'name': attachment.name,
+                'content': attachment.read(),
+                'type': attachment.content_type
+            }
 
         for item in recipients:
             first_name = item.get("first_name", "").strip()
@@ -67,7 +77,6 @@ class BulkInviteService:
                 if User.objects.filter(username=username).exists():
                     # If explicitly provided username exists, we must fail or adjust
                     # Let's auto-adjust to be safe but note it
-                    original_username = username
                     username = cls._make_username(first_name, last_name) # This handles collision
 
                 password = cls._random_password()
@@ -80,13 +89,19 @@ class BulkInviteService:
                 UserProfile.objects.get_or_create(user=user, defaults={"user_type": UserTypeChoices.RATER})
                 
                 # 3. Personalise Email
-                # We use first_name for the greeting
                 email_body = (
                     f"Dear Dr. {first_name},\n\n"
                     + body.replace("{name}", first_name).replace("{username}", username).replace("{password}", password)
                 )
 
-                send_mail(subject, email_body, from_email, [email_addr], fail_silently=False)
+                from django.core.mail import EmailMessage
+                email = EmailMessage(subject, email_body, from_email, [email_addr])
+                
+                if attachment_data:
+                    email.attach(attachment_data['name'], attachment_data['content'], attachment_data['type'])
+
+                email.send(fail_silently=False)
+                
                 results.append({
                     "name": f"{first_name} {last_name}".strip(), 
                     "email": email_addr, 
@@ -134,7 +149,7 @@ class BulkInviteService:
             send_mail(
                 "[Test] SES Connection ✅",
                 f"Connection to {host} is working!",
-                settings.DEFAULT_FROM_EMAIL,
+                getattr(settings, "DEFAULT_FROM_EMAIL", "TMCKolkata DRAW Team <noreply@compare.chavi.ai>"),
                 [admin_email],
                 fail_silently=False
             )

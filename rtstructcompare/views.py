@@ -797,6 +797,7 @@ def bulk_invite_users(request):
 
         subject = request.POST.get("subject", _DEFAULT_INVITE_SUBJECT).strip() or _DEFAULT_INVITE_SUBJECT
         body    = request.POST.get("body",    _DEFAULT_INVITE_BODY).strip()    or _DEFAULT_INVITE_BODY
+        attachment = request.FILES.get("attachment")
 
         recipients = []
         for f, l, u, e in zip(first_names, last_names, usernames, emails):
@@ -809,7 +810,7 @@ def bulk_invite_users(request):
                 })
         
         if recipients:
-            results = BulkInviteService.process_bulk_invite(recipients, subject, body)
+            results = BulkInviteService.process_bulk_invite(recipients, subject, body, attachment=attachment)
             
             # Store results in session so they survive the redirect (Standard PRG Pattern)
             request.session['bulk_invite_results'] = results
