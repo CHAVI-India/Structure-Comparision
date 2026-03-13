@@ -81,7 +81,7 @@
   </div>
   {% endif %}
 
-  <form method="post" id="invite-form" novalidate>
+  <form method="post" id="invite-form" novalidate enctype="multipart/form-data">
     {% csrf_token %}
 
     <!-- Step 1: Recipients -->
@@ -141,6 +141,13 @@
         <input id="id-subject" class="form-input" type="text" name="subject"
                value="{{ subject|default:'Invitation for rating to the Segmentation Comparison' }}"
                placeholder="Email subject…" required>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label class="form-label" for="id-attachment">Attachment (Optional)</label>
+        <input id="id-attachment" class="form-input" type="file" name="attachment" accept=".pdf"
+               style="padding: 10px; border: 1px dashed #cbd5e1; background: #f8fafc; cursor: pointer;">
+        <p class="hint">Upload a PDF manual or guide to include in every invitation email.</p>
       </div>
 
       <div>
