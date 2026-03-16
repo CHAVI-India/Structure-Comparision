@@ -658,7 +658,7 @@ def build_admin_dashboard_chart_data(*, range_days: int = 30) -> dict:
     }
 
 
-def build_admin_assignments_context(user: User, query_params: QueryDict) -> dict:
+def build_admin_assignments_context(user: User, query_params: QueryDict, paginate=True) -> dict:
     users = User.objects.order_by("username")
     patients = Patient.objects.order_by("patient_id")
     assignments = PatientAssignment.objects.select_related("user", "patient").order_by("-assigned_at")
@@ -848,9 +848,14 @@ def build_admin_assignments_context(user: User, query_params: QueryDict) -> dict
         ]
 
     # Re-paginating user rows after filters
-    user_page_number = query_params.get("user_page") or 1
-    user_paginator = Paginator(user_assignment_rows, 8)
-    user_page_obj = user_paginator.get_page(user_page_number)
+    if paginate:
+        user_page_number = query_params.get("user_page") or 1
+        user_paginator = Paginator(user_assignment_rows, 8)
+        user_page_obj = user_paginator.get_page(user_page_number)
+        final_user_rows = user_page_obj.object_list
+    else:
+        user_page_obj = None
+        final_user_rows = user_assignment_rows
 
     user_query_params_wo_page = query_params.copy()
     user_query_params_wo_page.pop("user_page", None)
@@ -863,8 +868,13 @@ def build_admin_assignments_context(user: User, query_params: QueryDict) -> dict
         reverse=True,
     )
 
-    paginator = Paginator(assignment_rows, 8)
-    page_obj = paginator.get_page(page_number)
+    if paginate:
+        paginator = Paginator(assignment_rows, 8)
+        page_obj = paginator.get_page(page_number)
+        final_assignment_rows = page_obj.object_list
+    else:
+        page_obj = None
+        final_assignment_rows = assignment_rows
 
     query_params_wo_page = query_params.copy()
     query_params_wo_page.pop("page", None)
@@ -878,13 +888,13 @@ def build_admin_assignments_context(user: User, query_params: QueryDict) -> dict
         "group_assignments": group_assignments,
         "assignment_groups": assignment_groups,
         "patient_assignments_map": patient_assignment_map,
-        "assignment_rows": page_obj.object_list,
+        "assignment_rows": final_assignment_rows,
         "assignment_page_obj": page_obj,
         "assignment_page_prefix": page_prefix,
         "assignment_search": search_term,
         "assignment_status": status_filter,
         "assignment_group_filter": group_filter,
-        "user_assignment_rows": user_page_obj.object_list,
+        "user_assignment_rows": final_user_rows,
         "user_page_obj": user_page_obj,
         "user_page_prefix": user_page_prefix,
     }

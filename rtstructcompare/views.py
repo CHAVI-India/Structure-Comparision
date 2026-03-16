@@ -876,7 +876,7 @@ def bulk_reminder_users(request):
 
         users = User.objects.filter(id__in=user_ids)
         
-        admin_context = build_admin_assignments_context(request.user, QueryDict(''))
+        admin_context = build_admin_assignments_context(request.user, QueryDict(''), paginate=False)
         user_rows = admin_context.get('user_assignment_rows', [])
         user_data_map = {str(row['user'].id): row for row in user_rows}
 
@@ -902,7 +902,7 @@ def bulk_reminder_users(request):
         
         return redirect('bulk_reminder_users')
 
-    admin_context = build_admin_assignments_context(request.user, request.GET)
+    admin_context = build_admin_assignments_context(request.user, request.GET, paginate=False)
     user_rows = admin_context.get('user_assignment_rows', [])
     
     results_data = request.session.pop('bulk_reminder_results', {})
