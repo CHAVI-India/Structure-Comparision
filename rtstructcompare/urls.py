@@ -19,6 +19,7 @@ urlpatterns = [
     path('admin/dashboard/charts/', views.admin_dashboard_charts, name='admin_dashboard_charts'),
     path('admin/assignments/', views.admin_assignments, name='admin_assignments'),
     path('admin/bulk-invite/', views.bulk_invite_users, name='bulk_invite_users'),
+    path('admin/bulk-reminder/', views.bulk_reminder_users, name='bulk_reminder_users'),
     path('admin/bulk-invite/test-connection/', views.test_email_connection, name='test_email_connection'),
     path('admin/', admin.site.urls),
 

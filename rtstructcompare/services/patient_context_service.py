@@ -99,26 +99,39 @@ def build_patient_context(
         entry["rtstruct__instance__series__study__patient_id"]: entry["total"]
         for entry in roi_counts
     }
-    feedback_counts = (
-        Feedback.objects.filter(
-            user=user, patient__in=patients_qs, roi_rt1__isnull=False
-        )
-        .exclude(rt1_rating__isnull=True, rt2_rating__isnull=True)
-        .values("patient_id")
-        .annotate(total=Count("common_roi_label", distinct=True))
-    )
-    feedback_count_map = {entry["patient_id"]: entry["total"] for entry in feedback_counts}
-
-    common_roi_entries = (
+    # 1. Get common ROI info (Labels with N >= 2 structures)
+    common_roi_query = (
         Roi.objects.filter(rtstruct__instance__series__study__patient__in=patients_qs)
         .values("rtstruct__instance__series__study__patient_id", "roi_label")
         .annotate(rtstruct_total=Count("rtstruct_id", distinct=True))
         .filter(rtstruct_total__gte=2)
     )
-    common_roi_map = defaultdict(int)
-    for entry in common_roi_entries:
-        patient_id = entry["rtstruct__instance__series__study__patient_id"]
-        common_roi_map[patient_id] += 1
+    # patient_id -> { label: instance_count }
+    patient_common_rois_info = defaultdict(dict)
+    for entry in common_roi_query:
+        p_id = entry["rtstruct__instance__series__study__patient_id"]
+        label = entry["roi_label"]
+        patient_common_rois_info[p_id][label] = entry["rtstruct_total"]
+
+    # 2. Get individual rating counts for each slot (rt1_rating and rt2_rating)
+    # We count how many times each structure in each pair has a rating.
+    rt1_ratings = (
+        Feedback.objects.filter(user=user, patient__in=patients_qs, rt1_rating__isnull=False)
+        .values("patient_id", "common_roi_label")
+        .annotate(count=Count("id"))
+    )
+    rt2_ratings = (
+        Feedback.objects.filter(user=user, patient__in=patients_qs, rt2_rating__isnull=False)
+        .values("patient_id", "common_roi_label")
+        .annotate(count=Count("id"))
+    )
+
+    # patient_id -> { label: total_filled_slots }
+    filled_slots_map = defaultdict(lambda: defaultdict(int))
+    for entry in rt1_ratings:
+        filled_slots_map[entry["patient_id"]][entry["common_roi_label"]] += entry["count"]
+    for entry in rt2_ratings:
+        filled_slots_map[entry["patient_id"]][entry["common_roi_label"]] += entry["count"]
 
     patients_data = []
     for patient in patients_qs:
@@ -137,12 +150,24 @@ def build_patient_context(
                 "series_count": series_count,
             })
 
-        total_rois = roi_count_map.get(patient.id, 0)
-        total_common_rois = common_roi_map.get(patient.id, 0)
-        feedback_roi_count = feedback_count_map.get(patient.id, 0)
-        pending_common_roi_count = max(total_common_rois - feedback_roi_count, 0)
+        # Counting rating slots (individual star ratings)
+        common_rois_info = patient_common_rois_info.get(patient.id, {})
+        patient_filled_slots = filled_slots_map.get(patient.id, {})
 
-        if total_common_rois == 0 or feedback_roi_count == 0:
+        total_rating_slots = 0
+        filled_rating_slots = 0
+        
+        for label, n in common_rois_info.items():
+            # A common label with N RTSTRUCTs has N*(N-1) rating slots total 
+            # (N*(N-1)/2 pairs, each with 2 slots)
+            total_rating_slots += n * (n - 1)
+            filled_rating_slots += patient_filled_slots.get(label, 0)
+
+        total_rois = roi_count_map.get(patient.id, 0)
+        feedback_roi_count = filled_rating_slots
+        pending_common_roi_count = max(total_rating_slots - filled_rating_slots, 0)
+
+        if total_rating_slots == 0 or filled_rating_slots == 0:
             feedback_state = "not_started"
         elif pending_common_roi_count == 0:
             feedback_state = "done"
@@ -154,8 +179,9 @@ def build_patient_context(
             "total_studies": patient_studies_count,
             "total_series": patient_series_count,
             "total_rois": total_rois,
-            "total_common_rois": total_common_rois,
+            "total_common_rois": total_rating_slots,
             "feedback_roi_count": feedback_roi_count,
+            "started_roi_count": filled_rating_slots,
             "pending_roi_count": pending_common_roi_count,
             "feedback_status": feedback_state,
             "studies": studies_data,

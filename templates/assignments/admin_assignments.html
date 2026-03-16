@@ -36,7 +36,7 @@
 
     <section class="panel assignment-details">
         <div class="section-header">
-            <h2>Assignment Details</h2>
+            <h2>Patient Assignments (Patient &rarr; Users)</h2>
         </div>
 
         <form method="get" class="assignment-filterbar">
@@ -172,6 +172,142 @@
                 <span class="page-status">Page {{ assignment_page_obj.number }} of {{ assignment_page_obj.paginator.num_pages }}</span>
                 {% if assignment_page_obj.has_next %}
                     <a class="page-link" href="{{ assignment_page_prefix }}page={{ assignment_page_obj.next_page_number }}">Next</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="panel assignment-details mt-10">
+        <div class="section-header">
+            <h2>User Assignments (User &rarr; Patients)</h2>
+        </div>
+
+        <form method="get" class="assignment-filterbar">
+            <div class="assignment-filterrow">
+                <div class="filter-field">
+                    <label class="filter-label" for="user_assignment_q">Search</label>
+                    <input
+                        id="user_assignment_q"
+                        name="q"
+                        type="search"
+                        class="filter-input"
+                        placeholder="Username, group, or patient ID"
+                        value="{{ assignment_search }}"
+                    />
+                </div>
+
+                <div class="filter-field">
+                    <label class="filter-label" for="user_assignment_status">Status</label>
+                    <select id="user_assignment_status" name="status" class="filter-select">
+                        <option value="" {% if not assignment_status %}selected{% endif %}>All</option>
+                        <option value="reviewed" {% if assignment_status == 'reviewed' %}selected{% endif %}>All Reviewed</option>
+                        <option value="pending" {% if assignment_status == 'pending' %}selected{% endif %}>Has Pending</option>
+                        <option value="unassigned" {% if assignment_status == 'unassigned' %}selected{% endif %}>No Assignments</option>
+                    </select>
+                </div>
+
+                <div class="filter-field">
+                    <label class="filter-label" for="user_assignment_group">Group</label>
+                    <select id="user_assignment_group" name="group" class="filter-select">
+                        <option value="" {% if not assignment_group_filter %}selected{% endif %}>All groups</option>
+                        {% for group in assignment_groups %}
+                            <option value="{{ group.id }}" {% if assignment_group_filter == group.id|stringformat:"s" %}selected{% endif %}>
+                                {{ group.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-field filter-actions">
+                    <button type="submit" class="btn btn-primary">Apply</button>
+                    <a class="btn btn-secondary" href="{% url 'admin_assignments' %}">Reset</a>
+                </div>
+            </div>
+        </form>
+
+        <div class="table-wrap">
+            <table class="assignment-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Assigned Patients</th>
+                        <th>Groups</th>
+                        <th>Progress</th>
+                        <th>Last Assigned</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in user_assignment_rows %}
+                        <tr>
+                            <td>
+                                <strong>{{ row.user.username }}</strong>
+                                {% if row.user.get_full_name %}
+                                    <div class="text-sm text-slate-500">{{ row.user.get_full_name }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="flex flex-wrap gap-1">
+                                    {% for patient in row.patients %}
+                                        <span class="pill" title="{{ patient.patient_id }}">{{ patient.patient_id }}</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if row.groups %}
+                                    {% for group_name in row.groups %}
+                                        <span class="pill pill-group">{{ group_name }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="progress-info">
+                                    <div class="progress-text">
+                                        <span>{{ row.reviewed_count }}/{{ row.total_count }}</span>
+                                        <span>{{ row.reviewed_percent }}%</span>
+                                    </div>
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill" style="width: {{ row.reviewed_percent }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if row.last_assigned %}
+                                    {{ row.last_assigned|date:"M d, Y" }}
+                                {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline btn-xs deactivate-user-btn"
+                                    data-user-id="{{ row.user.id }}"
+                                    data-username="{{ row.user.username }}"
+                                >
+                                    Deactivate
+                                </button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6">No user assignments found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if user_page_obj %}
+            <div class="assignment-pagination">
+                {% if user_page_obj.has_previous %}
+                    <a class="page-link" href="{{ user_page_prefix }}user_page={{ user_page_obj.previous_page_number }}">Prev</a>
+                {% endif %}
+                <span class="page-status">Page {{ user_page_obj.number }} of {{ user_page_obj.paginator.num_pages }}</span>
+                {% if user_page_obj.has_next %}
+                    <a class="page-link" href="{{ user_page_prefix }}user_page={{ user_page_obj.next_page_number }}">Next</a>
                 {% endif %}
             </div>
         {% endif %}

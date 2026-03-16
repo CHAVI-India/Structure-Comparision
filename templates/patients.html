@@ -134,48 +134,33 @@
                     </div>
                 </div>
 
-                <div>
-                    <div>
-                        {% if patient_data.feedback_roi_count > 0 %}
-                        <div>
-                            <strong>{{ patient_data.feedback_roi_count }}</strong>
-                            Feedback ROIs
-                        </div>
-                        <div>
-                            <strong>{{ patient_data.pending_roi_count }}</strong>
-                            Pending ROIs
-                        </div>
-                        {% else %}
-                        <div>
-                            <strong>{{ patient_data.total_studies }}</strong>
-                            Studies
-                        </div>
-                        <div>
-                            <strong>{{ patient_data.total_series }}</strong>
-                            Series
-                        </div>
-                        {% endif %}
+                <div class="patient-roi-stats-row">
+                    <div class="patient-stat-item">
+                        <strong>{{ patient_data.total_common_rois }}</strong>
+                        Total ROIs
                     </div>
-
-                    <div>
-                        <div>
-                            <a href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}" class="btn-compare {% if patient_data.feedback_status == 'done' %}btn-done{% elif patient_data.feedback_status == 'pending' %}btn-review{% endif %}" style="height: 100%;" onclick="if(window.Loader) window.Loader.show();">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 1.25rem; height: 1.25rem;">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4">
-                                </path>
-                            </svg>
-                            {% if patient_data.feedback_status == 'done' %}
-                            Done
-                            {% elif patient_data.feedback_status == 'pending' %}
-                            Review Studies
-                            {% else %}
-                            Compare Studies
-                            {% endif %}
-                            </a>
-                        </div>
+                    <div class="patient-stat-item">
+                        <strong>{{ patient_data.feedback_roi_count }}</strong>
+                        Feedback ROIs
+                    </div>
+                    <div class="patient-stat-item">
+                        <strong>{{ patient_data.pending_roi_count }}</strong>
+                        Pending ROIs
                     </div>
                 </div>
+
+                <a href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}" class="btn-compare {% if patient_data.feedback_status == 'done' %}btn-done{% elif patient_data.feedback_status == 'pending' %}btn-review{% endif %}" onclick="if(window.Loader) window.Loader.show();">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 1.25rem; height: 1.25rem;">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                    {% if patient_data.feedback_status == 'done' %}
+                        Done
+                    {% elif patient_data.feedback_status == 'pending' %}
+                        Review Pending
+                    {% else %}
+                        Compare Studies
+                    {% endif %}
+                </a>
             </div>
             {% endfor %}
             </div>

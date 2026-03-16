@@ -128,6 +128,72 @@ class BulkInviteService:
             "error_count": error_count,
         }
 
+    @classmethod
+    def process_bulk_reminder(cls, recipients, subject, body, attachment=None):
+        """
+        Sends reminder emails to existing users.
+        recipients: list of dicts with { 'user_id': int, 'email': str, 'name': str, 'pending_count': int }
+        """
+        results = []
+        sent_count = 0
+        error_count = 0
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "TMCKolkata DRAW Team <noreply@compare.chavi.ai>")
+
+        attachment_data = None
+        if attachment:
+            attachment_data = {
+                'name': attachment.name,
+                'content': attachment.read(),
+                'type': attachment.content_type
+            }
+
+        for item in recipients:
+            user_id = item.get("user_id")
+            email_addr = item.get("email", "").strip()
+            name = item.get("name", "").strip()
+            pending_count = item.get("pending_count", 0)
+
+            if not email_addr:
+                continue
+
+            try:
+                # Personalise Email
+                email_body = (
+                    f"Dear Dr. {name},\n\n"
+                    + body.replace("{name}", name).replace("{pending_count}", str(pending_count))
+                )
+
+                from django.core.mail import EmailMessage
+                email = EmailMessage(subject, email_body, from_email, [email_addr])
+                
+                if attachment_data:
+                    email.attach(attachment_data['name'], attachment_data['content'], attachment_data['type'])
+
+                email.send(fail_silently=False)
+                
+                results.append({
+                    "name": name, 
+                    "email": email_addr, 
+                    "status": "sent", 
+                    "note": "Success"
+                })
+                sent_count += 1
+            except Exception as e:
+                logger.exception("Bulk reminder error for %s", email_addr)
+                results.append({
+                    "name": name, 
+                    "email": email_addr, 
+                    "status": "error", 
+                    "note": str(e)
+                })
+                error_count += 1
+
+        return {
+            "results": results,
+            "sent_count": sent_count,
+            "error_count": error_count,
+        }
+
     @staticmethod
     def test_smtp_connection(admin_email):
         host = getattr(settings, "EMAIL_HOST", "")
