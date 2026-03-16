@@ -15,7 +15,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.db.models import Q, Count
 from django.db.models.functions import TruncDate
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, QueryDict
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -788,7 +788,6 @@ def bulk_invite_users(request):
     if not is_admin_user(request.user):
         return HttpResponseForbidden("Admin access required.")
 
-    # ── Handle POST: Process the invitation ──────────────────────────────────
     if request.method == "POST":
         first_names = request.POST.getlist("first_name[]")
         last_names  = request.POST.getlist("last_name[]")
@@ -811,11 +810,7 @@ def bulk_invite_users(request):
         
         if recipients:
             results = BulkInviteService.process_bulk_invite(recipients, subject, body, attachment=attachment)
-            
-            # Store results in session so they survive the redirect (Standard PRG Pattern)
             request.session['bulk_invite_results'] = results
-            
-            # Use messages framework for the status alert
             status_msg = f"Done: {results['sent_count']} sent, {results['skipped_count']} skipped, {results['error_count']} failed."
             if results['sent_count'] > 0:
                 messages.success(request, status_msg)
@@ -823,7 +818,6 @@ def bulk_invite_users(request):
                 messages.error(request, status_msg)
         else:
             messages.error(request, "No valid recipients provided.")
-            # Store the rows so they aren't lost on form validation error
             request.session['bulk_invite_post_rows'] = [
                 {"first_name": f, "last_name": l, "username": u, "email": e}
                 for f, l, u, e in zip(first_names, last_names, usernames, emails)
@@ -848,6 +842,82 @@ def bulk_invite_users(request):
     }
 
     return render(request, "bulk_invite.html", context)
+
+
+_DEFAULT_REMINDER_BODY = """This is a friendly reminder to complete the structure comparison ratings assigned to you.
+
+You have {pending_count} pending patient(s) to review. Your contributions are vital to this study.
+
+Please log in to https://compare.chavi.ai to complete your assignments.
+
+If you have already completed your tasks or have any questions, please ignore this email or reach out to us.
+
+Thanking You,
+Santam Chakraborty
+On behalf of the DRAW Autosegmentation Team"""
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def bulk_reminder_users(request):
+    """Admin-only view: select raters and send reminder emails."""
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden("Admin access required.")
+
+    if request.method == "POST":
+        user_ids = request.POST.getlist("user_ids[]")
+        subject = request.POST.get("subject", "Reminder: Segmentation Comparison Study").strip()
+        body = request.POST.get("body", _DEFAULT_REMINDER_BODY).strip() or _DEFAULT_REMINDER_BODY
+        attachment = request.FILES.get("attachment")
+
+        if not user_ids:
+            messages.error(request, "No recipients selected.")
+            return redirect('bulk_reminder_users')
+
+        users = User.objects.filter(id__in=user_ids)
+        
+        admin_context = build_admin_assignments_context(request.user, QueryDict(''))
+        user_rows = admin_context.get('user_assignment_rows', [])
+        user_data_map = {str(row['user'].id): row for row in user_rows}
+
+        recipients = []
+        for u in users:
+            row = user_data_map.get(str(u.id))
+            if row:
+                recipients.append({
+                    "user_id": u.id,
+                    "email": u.email,
+                    "name": f"{u.first_name} {u.last_name}".strip() or u.username,
+                    "pending_count": row.get('pending_count', 0)
+                })
+        
+        if recipients:
+            results = BulkInviteService.process_bulk_reminder(recipients, subject, body, attachment=attachment)
+            request.session['bulk_reminder_results'] = results
+            status_msg = f"Reminders sent: {results['sent_count']} successful, {results['error_count']} failed."
+            if results['sent_count'] > 0:
+                messages.success(request, status_msg)
+            else:
+                messages.error(request, status_msg)
+        
+        return redirect('bulk_reminder_users')
+
+    admin_context = build_admin_assignments_context(request.user, request.GET)
+    user_rows = admin_context.get('user_assignment_rows', [])
+    
+    results_data = request.session.pop('bulk_reminder_results', {})
+
+    context = {
+        "user_rows": user_rows,
+        "default_body": _DEFAULT_REMINDER_BODY,
+        "subject": "Reminder: Segmentation Comparison Study",
+        "body": _DEFAULT_REMINDER_BODY,
+        "results": results_data.get('results'),
+        "sent_count": results_data.get('sent_count', 0),
+        "error_count": results_data.get('error_count', 0),
+    }
+
+    return render(request, "bulk_reminder.html", context)
 
 
 @login_required

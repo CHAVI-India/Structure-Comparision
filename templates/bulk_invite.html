@@ -5,6 +5,12 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'rtstructcompare/css/bulk_invite.css' %}">
+<style>
+  .tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--slate-200); padding: 0 10px; }
+  .tab-link { padding: 12px 24px; text-decoration: none; color: var(--slate-400); font-weight: 700; border-radius: 10px 10px 0 0; border: 1px solid transparent; margin-bottom: -1px; transition: all 0.2s; font-size: 0.95rem; }
+  .tab-link:hover { color: var(--slate-600); background: #f8fafc; }
+  .tab-link.active { color: var(--teal-700); background: white; border-color: var(--slate-200) var(--slate-200) white; box-shadow: 0 -4px 12px rgba(0,0,0,0.03); }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -25,6 +31,12 @@
       </form>
     </div>
     <div id="test-result" class="test-result"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <a href="{% url 'bulk_invite_users' %}" class="tab-link active">🆕 New Invites</a>
+    <a href="{% url 'bulk_reminder_users' %}" class="tab-link">🔔 Reminders</a>
   </div>
 
   <!-- Alerts from previous POST (PRG Pattern) -->

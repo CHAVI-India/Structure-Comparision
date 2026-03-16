@@ -1,0 +1,302 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Bulk Reminders — Structure Comparison{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'rtstructcompare/css/bulk_invite.css' %}">
+<style>
+  .user-select-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .user-select-table th { text-align: left; padding: 12px; background: #f8fafc; color: var(--slate-600); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid var(--slate-200); }
+  .user-select-table td { padding: 14px 12px; border-bottom: 1px solid var(--slate-200); vertical-align: middle; font-size: 0.9rem; }
+  .user-select-table tr:hover td { background: var(--teal-50); }
+  
+  .progress-mini-container { display: flex; align-items: center; gap: 10px; }
+  .progress-mini { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; width: 60px; flex-shrink: 0; }
+  .progress-fill { height: 100%; background: var(--teal-600); }
+  .pending-badge { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; }
+  
+  .checkbox-cell { width: 44px; text-align: center; }
+  .cb-large { width: 18px; height: 18px; cursor: pointer; accent-color: var(--teal-600); }
+  
+  .tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--slate-200); padding: 0 10px; }
+  .tab-link { padding: 12px 24px; text-decoration: none; color: var(--slate-400); font-weight: 700; border-radius: 10px 10px 0 0; border: 1px solid transparent; margin-bottom: -1px; transition: all 0.2s; font-size: 0.95rem; }
+  .tab-link:hover { color: var(--slate-600); background: #f8fafc; }
+  .tab-link.active { color: var(--teal-700); background: white; border-color: var(--slate-200) var(--slate-200) white; box-shadow: 0 -4px 12px rgba(0,0,0,0.03); }
+
+  .select-controls { display: flex; gap: 12px; margin-bottom: 16px; }
+  .btn-outline { background: white; border: 1.5px solid var(--slate-200); padding: 6px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; color: var(--slate-600); cursor: pointer; }
+  .btn-outline:hover { background: #f8fafc; border-color: var(--slate-400); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="invite-container">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+      <div>
+        <h1>🔔 Send Reminders</h1>
+        <p>Remind raters to complete their assigned patient reviews.</p>
+      </div>
+      <form id="test-form" method="post" action="{% url 'test_email_connection' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn-test" id="btn-test">
+          <span id="test-icon">🔌</span> Test SMTP Connection
+        </button>
+      </form>
+    </div>
+    <div id="test-result" class="test-result"></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <a href="{% url 'bulk_invite_users' %}" class="tab-link">🆕 New Invites</a>
+    <a href="{% url 'bulk_reminder_users' %}" class="tab-link active">🔔 Reminders</a>
+  </div>
+
+  <!-- Alerts -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %} status-auto-hide">
+        <span class="alert-icon">{% if message.tags == 'success' %}✅{% else %}❌{% endif %}</span>
+        <span>{{ message }}</span>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Results report -->
+  {% if results %}
+  <div class="card">
+    <div class="card-title">📋 Reminder Report</div>
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td>{{ r.email }}</td>
+          <td>
+            {% if r.status == 'sent' %}
+              <span class="status-ok">✓ Sent</span>
+            {% else %}
+              <span class="status-err">✗ Error</span>
+            {% endif %}
+          </td>
+          <td>{{ r.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <form method="post" id="reminder-form" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <!-- Step 1: Select Users -->
+    <div class="card">
+      <div class="card-title">
+        <span class="step-badge">1</span>
+        Select Recipients
+      </div>
+      
+      <div class="select-controls">
+        <button type="button" class="btn-outline" onclick="selectAllUsers(true)">Select All</button>
+        <button type="button" class="btn-outline" onclick="selectAllUsers(false)">Deselect All</button>
+        <button type="button" class="btn-outline" onclick="selectPendingOnly()">Select Pending Only</button>
+      </div>
+
+      <div style="max-height: 500px; overflow-y: auto; border: 1px solid var(--slate-200); border-radius: 12px;">
+        <table class="user-select-table">
+          <thead>
+            <tr>
+              <th class="checkbox-cell"></th>
+              <th>User</th>
+              <th>Email</th>
+              <th>Groups</th>
+              <th>Progress</th>
+              <th>Pending Tasks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in user_rows %}
+            <tr>
+              <td class="checkbox-cell">
+                <input type="checkbox" name="user_ids[]" value="{{ row.user.id }}" class="cb-large user-cb" 
+                       {% if row.pending_count > 0 %}data-pending="true"{% endif %}>
+              </td>
+              <td>
+                <div style="font-weight: 700; color: var(--slate-800);">{{ row.user.first_name }} {{ row.user.last_name }}</div>
+                <div style="font-size: 0.75rem; color: var(--slate-400);">@{{ row.user.username }}</div>
+              </td>
+              <td>{{ row.user.email }}</td>
+              <td>
+                <div style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ row.groups|join:', ' }}">
+                  {{ row.groups|join:", "|default:"—" }}
+                </div>
+              </td>
+              <td class="progress-cell">
+                <div class="progress-mini-container">
+                  <div class="progress-mini">
+                    <div class="progress-fill" style="--progress: {{ row.reviewed_percent }}%; width: var(--progress);"></div>
+                  </div>
+                  <span style="font-size: 0.75rem; font-weight: 700;">{{ row.reviewed_percent }}%</span>
+                </div>
+              </td>
+              <td>
+                {% if row.pending_count > 0 %}
+                  <span class="pending-badge">{{ row.pending_count }} tasks left</span>
+                {% else %}
+                  <span style="color: var(--green-600); font-weight: 600;">✅ Done</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" style="text-align:center; padding: 40px; color: var(--slate-400);">
+                No users with assignments found.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Step 2: Email Content -->
+    <div class="card">
+      <div class="card-title">
+        <span class="step-badge">2</span>
+        Reminder Content
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label class="form-label" for="id-subject">Subject Line</label>
+        <input id="id-subject" class="form-input" type="text" name="subject"
+               value="{{ subject }}" placeholder="Email subject…" required>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <label class="form-label" for="id-attachment">Attachment (Optional)</label>
+        <input id="id-attachment" class="form-input" type="file" name="attachment" accept=".pdf">
+      </div>
+
+      <div>
+        <label class="form-label" for="id-body">
+          Body — <em style="text-transform:none; font-weight:400; color:#94a3b8;">use <code>{name}</code> and <code>{pending_count}</code> as placeholders</em>
+        </label>
+        <textarea id="id-body" class="form-input" name="body" rows="12" required
+                  oninput="updatePreview()">{{ body }}</textarea>
+      </div>
+    </div>
+
+    <!-- Step 3: Preview -->
+    <div class="card">
+      <div class="card-title">
+        <span class="step-badge">3</span>
+        Preview
+      </div>
+      <div class="preview-header">
+        <span class="preview-label">Sample Preview (using placeholders)</span>
+      </div>
+      <div class="preview-box" id="preview-box">Loading…</div>
+    </div>
+
+    <!-- Submit -->
+    <div style="display:flex; justify-content:flex-end; padding-bottom:40px;">
+      <button type="submit" class="btn-submit" id="btn-submit">
+        <span id="btn-icon">🔔</span>
+        <span id="btn-text">Send Reminder Emails</span>
+      </button>
+    </div>
+
+  </form>
+</div>
+
+{% block extra_js %}
+<script>
+  function selectAllUsers(checked) {
+    document.querySelectorAll('.user-cb').forEach(cb => cb.checked = checked);
+  }
+
+  function selectPendingOnly() {
+    document.querySelectorAll('.user-cb').forEach(cb => {
+      cb.checked = (cb.dataset.pending === "true");
+    });
+  }
+
+  function updatePreview() {
+    const bodyText = document.getElementById('id-body').value;
+    const previewBox = document.getElementById('preview-box');
+    
+    // Sample placeholders for preview
+    let preview = bodyText
+      .replace(/{name}/g, "John Doe")
+      .replace(/{pending_count}/g, "3");
+      
+    previewBox.textContent = "Dear Dr. John Doe,\n\n" + preview;
+  }
+
+  // Initial preview
+  document.addEventListener('DOMContentLoaded', updatePreview);
+
+  // Status auto-hide
+  setTimeout(() => {
+    document.querySelectorAll('.status-auto-hide').forEach(el => {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 800);
+    });
+  }, 5000);
+
+  // Test SMTP Connection (simplified ajax)
+  document.getElementById('test-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-test');
+    const resultDiv = document.getElementById('test-result');
+    const icon = document.getElementById('test-icon');
+    
+    btn.disabled = true;
+    icon.textContent = "⏳";
+    resultDiv.style.display = 'none';
+    
+    try {
+      const response = await fetch(this.action, {
+        method: 'POST',
+        body: new FormData(this)
+      });
+      const data = await response.json();
+      resultDiv.textContent = data.message || data.error;
+      resultDiv.className = 'test-result ' + (data.success ? 'ok' : 'err');
+      resultDiv.style.display = 'block';
+    } catch (err) {
+      resultDiv.textContent = "Network error occurred.";
+      resultDiv.className = 'test-result err';
+      resultDiv.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      icon.textContent = "🔌";
+    }
+  });
+
+  // Submit button state
+  document.getElementById('reminder-form').addEventListener('submit', function() {
+    const btn = document.getElementById('btn-submit');
+    const icon = document.getElementById('btn-icon');
+    const text = document.getElementById('btn-text');
+    
+    btn.disabled = true;
+    icon.innerHTML = '<span class="spinner"></span>';
+    text.textContent = 'Sending... Please wait';
+  });
+</script>
+{% endblock %}
+{% endblock %}

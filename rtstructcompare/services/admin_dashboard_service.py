@@ -755,6 +755,108 @@ def build_admin_assignments_context(user: User, query_params: QueryDict) -> dict
             row for row in assignment_rows if group_filter in (row.get("group_ids") or set())
         ]
 
+    # --- User-centric assignment rows ---
+    user_map = {
+        u.id: {
+            "user": u,
+            "patient_ids": set(),
+            "groups": set(),
+            "group_ids": set(),
+            "last_assigned": None,
+        }
+        for u in users
+    }
+
+    # Re-calculate assignments for users
+    for assignment in assignments:
+        u_entry = user_map.get(assignment.user_id)
+        if u_entry:
+            u_entry["patient_ids"].add(assignment.patient_id)
+            if u_entry["last_assigned"] is None or assignment.assigned_at > u_entry["last_assigned"]:
+                u_entry["last_assigned"] = assignment.assigned_at
+
+    for assignment in group_assignments:
+        for group_user in assignment.group.users.all():
+            u_entry = user_map.get(group_user.id)
+            if u_entry:
+                u_entry["patient_ids"].add(assignment.patient_id)
+                u_entry["groups"].add(assignment.group.name)
+                u_entry["group_ids"].add(str(assignment.group_id))
+                if u_entry["last_assigned"] is None or assignment.assigned_at > u_entry["last_assigned"]:
+                    u_entry["last_assigned"] = assignment.assigned_at
+
+    user_patient_feedback = set(
+        Feedback.objects.values_list("user_id", "patient_id").distinct()
+    )
+
+    p_id_map = {p.id: p for p in patients}
+    user_assignment_rows = []
+    for u_id, entry in user_map.items():
+        # Logic: If we are not filtering by "unassigned", we might want to skip users with 0 patients
+        # However, to keep it consistent with the patient table, let's include those who pass filters.
+        
+        patients_list = []
+        reviewed_count = 0
+        for pid in entry["patient_ids"]:
+            p_obj = p_id_map.get(pid)
+            if p_obj:
+                patients_list.append(p_obj)
+                if (u_id, pid) in user_patient_feedback:
+                    reviewed_count += 1
+        
+        entry["patients"] = sorted(patients_list, key=lambda p: p.patient_id)
+        entry["total_count"] = len(patients_list)
+        entry["reviewed_count"] = reviewed_count
+        entry["pending_count"] = entry["total_count"] - reviewed_count
+        entry["reviewed_percent"] = round(reviewed_count / entry["total_count"] * 100) if entry["total_count"] > 0 else 0
+        entry["groups"] = sorted(list(entry["groups"]))
+        
+        user_assignment_rows.append(entry)
+
+    # Search filter for users
+    if search_term:
+        lowered = search_term.lower()
+        user_assignment_rows = [
+            row
+            for row in user_assignment_rows
+            if lowered in row["user"].username.lower()
+            or any(lowered in p.patient_id.lower() for p in row["patients"])
+            or any(lowered in g.lower() for g in row["groups"])
+        ]
+
+    # Sort users: most recently assigned first
+    user_assignment_rows.sort(
+        key=lambda r: (r.get("last_assigned") is not None, r.get("last_assigned")),
+        reverse=True,
+    )
+
+    # Apply Status and Group filters to user rows
+    if status_filter:
+        if status_filter == "reviewed":
+            user_assignment_rows = [row for row in user_assignment_rows if row.get("total_count") > 0 and row.get("pending_count") == 0]
+        elif status_filter == "pending":
+            user_assignment_rows = [row for row in user_assignment_rows if row.get("pending_count") > 0]
+        elif status_filter == "unassigned":
+            user_assignment_rows = [row for row in user_assignment_rows if row.get("total_count") == 0]
+    else:
+        # Default: hide unassigned users unless specifically requested
+        user_assignment_rows = [row for row in user_assignment_rows if row.get("total_count") > 0]
+
+    if group_filter:
+        user_assignment_rows = [
+            row for row in user_assignment_rows if group_filter in row.get("group_ids", set())
+        ]
+
+    # Re-paginating user rows after filters
+    user_page_number = query_params.get("user_page") or 1
+    user_paginator = Paginator(user_assignment_rows, 8)
+    user_page_obj = user_paginator.get_page(user_page_number)
+
+    user_query_params_wo_page = query_params.copy()
+    user_query_params_wo_page.pop("user_page", None)
+    user_querystring = user_query_params_wo_page.urlencode()
+    user_page_prefix = f"?{user_querystring}&" if user_querystring else "?"
+
     # Sort: most recently assigned first
     assignment_rows.sort(
         key=lambda r: (r.get("last_assigned") is not None, r.get("last_assigned")),
@@ -782,4 +884,7 @@ def build_admin_assignments_context(user: User, query_params: QueryDict) -> dict
         "assignment_search": search_term,
         "assignment_status": status_filter,
         "assignment_group_filter": group_filter,
+        "user_assignment_rows": user_page_obj.object_list,
+        "user_page_obj": user_page_obj,
+        "user_page_prefix": user_page_prefix,
     }
