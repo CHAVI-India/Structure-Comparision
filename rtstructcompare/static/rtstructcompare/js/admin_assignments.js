@@ -1,6 +1,8 @@
 document.addEventListener('DOMContentLoaded', function () {
     const userSearchInput = document.getElementById('user_search');
     const searchInput = document.getElementById('patient_search');
+    const bulkGroupSearchInput = document.getElementById('bulk_group_search');
+    const bulkPatientSearchInput = document.getElementById('bulk_patient_search');
     const groupUserSearchInput = document.getElementById('group_user_search');
     const groupUserSelect = document.getElementById('group_user_ids');
     const groupModal = document.getElementById('groupModal');
@@ -77,7 +79,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const term = input.value.trim().toLowerCase();
             document.querySelectorAll(itemsSelector).forEach((card) => {
                 const label = (card.dataset.label || '').toLowerCase();
-                card.hidden = term ? !label.includes(term) : false;
+                const matches = label.includes(term);
+                if (term) {
+                    card.style.display = matches ? '' : 'none';
+                    card.hidden = !matches;
+                } else {
+                    card.style.display = '';
+                    card.hidden = false;
+                }
             });
         });
     };
@@ -111,6 +120,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     attachCardFilter(userSearchInput, '#userList .user-card, #userList [data-user-id]');
     attachCardFilter(searchInput, '#patientList .patient-card');
+    attachCardFilter(bulkGroupSearchInput, '#bulkGroupList .group-card');
+    attachCardFilter(bulkPatientSearchInput, '#bulkPatientList .patient-card');
     attachFilter(groupUserSearchInput, groupUserSelect);
 
     if (unassignPatientButtons && unassignPatientButtons.length) {
