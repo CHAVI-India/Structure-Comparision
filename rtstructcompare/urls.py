@@ -22,6 +22,7 @@ urlpatterns = [
     path('admin/bulk-reminder/', views.bulk_reminder_users, name='bulk_reminder_users'),
     path('admin/bulk-invite/test-connection/', views.test_email_connection, name='test_email_connection'),
     path('admin/feedbacks/<uuid:feedback_id>/delete/', views.delete_feedback, name='delete_feedback'),
+    path('admin/api-tokens/', views.api_token_management, name='api_token_management'),
     path('admin/', admin.site.urls),
 
 
@@ -44,4 +45,5 @@ urlpatterns = [
     path('api/get-dicom-slice/', views.get_dicom_slice, name='get_dicom_slice'),
     path('api/submit-feedback/', views.submit_feedback, name='submit_feedback'),
     path('api/submit-user-details/', views.submit_user_details, name='submit_user_details'),
+    path('api/feedbacks/', views.api_feedbacks, name='api_feedbacks'),
 ]

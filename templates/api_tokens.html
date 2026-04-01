@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}API Tokens{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">API Tokens</h1>
+            <p class="text-sm text-slate-500 mt-1">Manage tokens for the external <code class="bg-slate-100 px-1 rounded">/api/feedbacks/</code> endpoint. Superuser access only.</p>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 rounded-lg px-4 py-3 text-sm font-medium
+                {% if message.tags == 'success' %}bg-green-50 border border-green-200 text-green-800
+                {% else %}bg-red-50 border border-red-200 text-red-800{% endif %}">
+                {% if message.tags == 'success' and 'created' in message.message %}
+                    <p class="font-semibold mb-1">Token created. Copy it now — it will not be shown again in full.</p>
+                    <code class="block break-all bg-white border border-green-200 rounded px-3 py-2 mt-1 text-xs text-slate-800 select-all">{{ message }}</code>
+                {% else %}
+                    {{ message }}
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm mb-8">
+        <div class="px-5 py-4 border-b border-slate-100">
+            <h2 class="text-base font-semibold text-slate-800">Generate New Token</h2>
+        </div>
+        <form method="post" class="px-5 py-4 flex flex-wrap items-end gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div class="flex-1 min-w-48">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Label <span class="text-slate-400">(optional)</span></label>
+                <input type="text" name="label" placeholder="e.g. second-app, analytics-tool"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
+            </div>
+            <button type="submit"
+                class="px-5 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold transition-colors">
+                Generate Token
+            </button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
+        <div class="px-5 py-4 border-b border-slate-100">
+            <h2 class="text-base font-semibold text-slate-800">Existing Tokens</h2>
+        </div>
+
+        {% if tokens %}
+            <div class="divide-y divide-slate-100">
+                {% for tok in tokens %}
+                <div class="px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-sm font-mono text-slate-700 break-all">{{ tok.token }}</span>
+                            {% if tok.is_active %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">Revoked</span>
+                            {% endif %}
+                        </div>
+                        <div class="mt-1 flex flex-wrap gap-3 text-xs text-slate-400">
+                            {% if tok.label %}<span>Label: <span class="text-slate-600 font-medium">{{ tok.label }}</span></span>{% endif %}
+                            <span>Owner: <span class="text-slate-600">{{ tok.user.username }}</span></span>
+                            <span>Created: {{ tok.created_at|date:"d M Y, H:i" }}</span>
+                            <span>Last used: {% if tok.last_used_at %}{{ tok.last_used_at|date:"d M Y, H:i" }}{% else %}Never{% endif %}</span>
+                        </div>
+                    </div>
+                    {% if tok.is_active %}
+                    <form method="post" onsubmit="return confirm('Revoke this token? Any app using it will lose access immediately.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="revoke">
+                        <input type="hidden" name="token_id" value="{{ tok.id }}">
+                        <button type="submit"
+                            class="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors">
+                            Revoke
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="px-5 py-10 text-center text-sm text-slate-400">No tokens yet. Generate one above.</div>
+        {% endif %}
+    </div>
+
+    <div class="mt-6 bg-slate-50 border border-slate-200 rounded-lg px-5 py-4 text-xs text-slate-600">
+        <p class="font-semibold text-slate-700 mb-2">How to use</p>
+        <p class="mb-1">Include the token in every request to <code class="bg-slate-100 px-1 rounded">GET /api/feedbacks/</code>:</p>
+        <code class="block bg-white border border-slate-200 rounded px-3 py-2 mt-1 text-slate-800">Authorization: Token &lt;your_token&gt;</code>
+        <p class="mt-3 font-semibold text-slate-700 mb-1">Optional query params</p>
+        <code class="block bg-white border border-slate-200 rounded px-3 py-2 text-slate-800">?format=json &nbsp;(default) &nbsp;|&nbsp; ?format=csv &nbsp;|&nbsp; ?format=xlsx</code>
+        <code class="block bg-white border border-slate-200 rounded px-3 py-2 mt-1 text-slate-800">?page=1 &amp;page_size=25 &amp;username= &amp;patient_id= &amp;roi_label= &amp;date_from= &amp;date_to=</code>
+    </div>
+</div>
+{% endblock %}
