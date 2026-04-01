@@ -1,5 +1,6 @@
 import logging
 import pydicom
+import shutil
 import tempfile
 import posixpath
 from uuid import uuid4
@@ -29,6 +30,16 @@ class DicomImportError(Exception):
 
 def _get_dicom_upload_prefix():
     return getattr(settings, 'DICOM_S3_PREFIX', 'dicom_uploads')
+
+
+# def _build_local_storage_context(root_directory: Path):
+#     storage_root = Path(getattr(settings, 'DICOM_STORAGE_ROOT', settings.MEDIA_ROOT / 'dicom_files'))
+#     storage_root.mkdir(parents=True, exist_ok=True)
+#     return {
+#         'type': 'local',
+#         'storage_root': storage_root,
+#         'root_directory': root_directory,
+#     }
 
 
 def _build_s3_storage_context(root_directory: Path):
@@ -80,6 +91,13 @@ def _store_file_reference(file_path: Path, root_directory: Path, storage_context
             dir_key = posixpath.join(storage_context['base_prefix'], patient_segment)
         dir_uri = f"s3://{storage_context['bucket']}/{dir_key}"
         return file_uri, dir_uri
+
+    # if storage_context and storage_context.get('type') == 'local':
+    #     patient_segment = patient_identifier or uuid4().hex
+    #     dest_path = storage_context['storage_root'] / patient_segment / relative_path
+    #     dest_path.parent.mkdir(parents=True, exist_ok=True)
+    #     shutil.copy2(str(file_path), str(dest_path))
+    #     return str(dest_path), str(dest_path.parent)
 
     return str(file_path), str(file_path.parent)
 
@@ -340,6 +358,8 @@ def import_dicom_file_objects(uploaded_files, *, progress_callback=None):
 
         if getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None):
             storage_context = _build_s3_storage_context(temp_root)
+        # else:
+        #     storage_context = _build_local_storage_context(temp_root)
 
         stats = import_dicom_directory(
             temp_root,
