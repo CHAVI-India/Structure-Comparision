@@ -456,6 +456,12 @@ def build_admin_dashboard_context(user: User, query_params: QueryDict) -> dict:
         .count()
     )
     idle_reviewers_count = max(len(assigned_user_ids) - active_reviewers_count, 0)
+    users_with_feedback_count = (
+        Feedback.objects.exclude(user__isnull=True)
+        .values("user_id")
+        .distinct()
+        .count()
+    )
 
     # Oldest pending patients (top 6)
     pending_patients_rows = []
@@ -547,6 +553,7 @@ def build_admin_dashboard_context(user: User, query_params: QueryDict) -> dict:
             "pending_assignment_users": pending_assignment_user_count,
             "active_reviewers": active_reviewers_count,
             "idle_reviewers": idle_reviewers_count,
+            "users_with_feedback": users_with_feedback_count,
         },
         "activity": {
             "assignments_last_7_days": recent_assignment_count,

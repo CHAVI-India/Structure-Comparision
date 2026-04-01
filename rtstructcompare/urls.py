@@ -21,6 +21,7 @@ urlpatterns = [
     path('admin/bulk-invite/', views.bulk_invite_users, name='bulk_invite_users'),
     path('admin/bulk-reminder/', views.bulk_reminder_users, name='bulk_reminder_users'),
     path('admin/bulk-invite/test-connection/', views.test_email_connection, name='test_email_connection'),
+    path('admin/feedbacks/<uuid:feedback_id>/delete/', views.delete_feedback, name='delete_feedback'),
     path('admin/', admin.site.urls),
 
 
@@ -38,6 +39,7 @@ urlpatterns = [
     path('patients/<uuid:patient_uuid>/remove-access/', views.remove_patient_access, name='remove_patient_access'),
     path('patients/<uuid:patient_uuid>/delete/', views.delete_patient, name='delete_patient'),
     
+    # path('dicom/local/<str:sop_instance_uid>/', views.serve_local_dicom, name='serve_local_dicom'),
     path('api/load-dicom-data/', views.load_dicom_data, name='load_dicom_data'),
     path('api/get-dicom-slice/', views.get_dicom_slice, name='get_dicom_slice'),
     path('api/submit-feedback/', views.submit_feedback, name='submit_feedback'),

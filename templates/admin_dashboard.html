@@ -38,6 +38,11 @@
                 <div class="value">{{ dashboard_metrics.feedback.total_feedback|default:assigned_feedbacks_count }}</div>
                 <p class="stat-subtext">{{ dashboard_metrics.activity.feedback_last_7_days|default:"0" }} updated last 7 days</p>
             </div>
+            <div class="stat-card">
+                <div class="label">Users with Feedback</div>
+                <div class="value">{{ dashboard_metrics.feedback.users_with_feedback|default:"0" }}</div>
+                <p class="stat-subtext">users who gave at least 1 feedback</p>
+            </div>
         </div>
     </section>
 

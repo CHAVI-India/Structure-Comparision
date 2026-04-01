@@ -88,6 +88,7 @@
                     <tr>
                         <th>Patient</th>
                         <th>Assigned Users</th>
+                        <th>Count</th>
                         <th>Groups</th>
                         <th>Review Status</th>
                         <th>Last Assigned</th>
@@ -112,6 +113,9 @@
                                 {% else %}
                                     <span class="text-sm text-slate-400">—</span>
                                 {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="pill{% if row.usernames %} pill-success{% endif %}">{{ row.usernames|length }}</span>
                             </td>
                             <td>
                                 {% if row.groups %}

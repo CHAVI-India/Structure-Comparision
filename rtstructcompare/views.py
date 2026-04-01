@@ -15,7 +15,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.db.models import Q, Count
 from django.db.models.functions import TruncDate
-from django.http import JsonResponse, HttpResponseForbidden, QueryDict
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponse, QueryDict, FileResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -941,3 +941,25 @@ def test_email_connection(request):
 
     success, msg = BulkInviteService.test_smtp_connection(to_email)
     return JsonResponse({"success": success, "message": msg})
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_feedback(request, feedback_id):
+    if not is_admin_user(request.user):
+        return HttpResponseForbidden('Admin access required.')
+    feedback = get_object_or_404(Feedback, id=feedback_id)
+    feedback.delete()
+    next_url = request.POST.get('next') or reverse('admin_feedbacks')
+    return redirect(next_url)
+
+
+# @login_required
+# @require_http_methods(["GET"])
+# def serve_local_dicom(request, sop_instance_uid):
+#     """Serve a locally-stored DICOM file by SOP Instance UID (dev/local use only)."""
+#     instance = get_object_or_404(DICOMInstance, sop_instance_uid=sop_instance_uid)
+#     path = Path(instance.instance_path or '')
+#     if not path.exists():
+#         return HttpResponse(status=404)
+#     return FileResponse(open(path, 'rb'), content_type='application/dicom')
