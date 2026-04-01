@@ -119,6 +119,7 @@
                     <th class="text-left px-3 py-2">RT2 Rating</th>
                     <th class="text-left px-3 py-2">Comment</th>
                     <th class="text-left px-3 py-2">Updated</th>
+                    <th class="text-left px-3 py-2">Delete</th>
                 </tr>
             </thead>
             <tbody>
@@ -133,10 +134,17 @@
                         <td class="px-3 py-2">{{ feedback.rt2_rating|default:"—" }}</td>
                         <td class="px-3 py-2">{{ feedback.comment|default:"—"|truncatechars:80 }}</td>
                         <td class="px-3 py-2">{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                        <td class="px-3 py-2">
+                            <form method="post" action="{% url 'delete_feedback' feedback.id %}" onsubmit="return confirm('Delete this feedback entry?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200 font-semibold">Delete</button>
+                            </form>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td class="px-3 py-8 text-center text-slate-500" colspan="9">No feedback found.</td>
+                        <td class="px-3 py-8 text-center text-slate-500" colspan="10">No feedback found.</td>
                     </tr>
                 {% endfor %}
             </tbody>
