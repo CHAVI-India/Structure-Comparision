@@ -280,3 +280,20 @@ class UserDetails(models.Model):
     class Meta:
         db_table = "user_details"
         ordering = ['-created_at']
+
+
+class APIToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='api_tokens')
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    label = models.CharField(max_length=128, blank=True, default='', help_text='Optional label to identify this token')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.username} – {self.label or self.token[:8]}…"
+
+    class Meta:
+        db_table = "api_tokens"
+        ordering = ['-created_at']

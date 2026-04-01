@@ -41,6 +41,7 @@ from .models import (
     PatientAssignment,
     GroupPatientAssignment,
     UserDetails,
+    APIToken,
 )
 from .services.dicom_import_service import import_dicom_file_objects, DicomImportError
 from .services.dicom_viewer_service import build_viewer_context, DicomViewerError
@@ -952,6 +953,171 @@ def delete_feedback(request, feedback_id):
     feedback.delete()
     next_url = request.POST.get('next') or reverse('admin_feedbacks')
     return redirect(next_url)
+
+
+# ─── API Token Management (superuser only) ────────────────────────────────────
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def api_token_management(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden('Superuser access required.')
+
+    if request.method == "POST":
+        action = request.POST.get('action')
+
+        if action == 'create':
+            import secrets
+            label = request.POST.get('label', '').strip()
+            raw = secrets.token_hex(32)
+            APIToken.objects.create(user=request.user, token=raw, label=label)
+            messages.success(request, f'New token created: {raw}')
+
+        elif action == 'revoke':
+            token_id = request.POST.get('token_id')
+            updated = APIToken.objects.filter(id=token_id, is_active=True).update(is_active=False)
+            if updated:
+                messages.success(request, 'Token revoked.')
+            else:
+                messages.error(request, 'Token not found or already revoked.')
+
+        return redirect('api_token_management')
+
+    tokens = APIToken.objects.select_related('user').all()
+    return render(request, 'api_tokens.html', {'tokens': tokens})
+
+
+# ─── External API ─────────────────────────────────────────────────────────────
+
+def _authenticate_api_token(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    if not auth_header:
+        return None, JsonResponse({'error': 'Authorization header missing.'}, status=401)
+
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0].lower() not in ('token', 'bearer'):
+        return None, JsonResponse(
+            {'error': 'Invalid Authorization header. Expected: Authorization: Token <your_token>'},
+            status=401,
+        )
+
+    raw_token = parts[1]
+    try:
+        api_token = APIToken.objects.select_related('user').get(token=raw_token, is_active=True)
+    except APIToken.DoesNotExist:
+        return None, JsonResponse({'error': 'Invalid or inactive token.'}, status=401)
+
+    if not is_admin_user(api_token.user):
+        return None, JsonResponse({'error': 'Token does not belong to an admin user.'}, status=403)
+
+    APIToken.objects.filter(pk=api_token.pk).update(last_used_at=timezone.now())
+    return api_token, None
+
+
+def _feedback_to_dict(fb):
+    return {
+        'id': str(fb.id),
+        'username': fb.user.username if fb.user else '',
+        'patient_id': fb.patient.patient_id if fb.patient else '',
+        'rt1_sop_uid': fb.rt1_sop_uid or '',
+        'rt2_sop_uid': fb.rt2_sop_uid or '',
+        'roi_label': fb.common_roi_label or '',
+        'rt1_label': fb.rt1_label or '',
+        'rt1_rating': fb.rt1_rating,
+        'rt2_label': fb.rt2_label or '',
+        'rt2_rating': fb.rt2_rating,
+        'comment': fb.comment or '',
+        'created_at': fb.created_at.isoformat() if fb.created_at else '',
+        'updated_at': fb.updated_at.isoformat() if fb.updated_at else '',
+    }
+
+
+_FEEDBACK_CSV_HEADERS = [
+    'id', 'username', 'patient_id',
+    'rt1_sop_uid', 'rt2_sop_uid',
+    'roi_label', 'rt1_label', 'rt1_rating',
+    'rt2_label', 'rt2_rating',
+    'comment', 'created_at', 'updated_at',
+]
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_feedbacks(request):
+    """
+    External REST API – returns all feedbacks.
+
+    Authentication
+    --------------
+    Include in every request:
+        Authorization: Token <your_token>
+
+    Optional query params (same filters as the admin feedback page)
+    --------------------------------------------------------------
+    q, username, patient_id, roi_label, rating,
+    date_from (YYYY-MM-DD), date_to (YYYY-MM-DD),
+    sort_by, order, page, page_size
+
+    Response format  (default: JSON)
+    ---------------------------------
+    ?format=json   paginated JSON
+    ?format=csv    CSV file download
+    ?format=xlsx   XLSX file download
+    """
+    api_token, err = _authenticate_api_token(request)
+    if err:
+        return err
+
+    params = parse_feedback_list_params(request.GET)
+    qs = build_feedback_queryset(scope="admin", user=api_token.user, params=params)
+    fmt = (request.GET.get('format') or 'json').lower()
+
+    if fmt == 'csv':
+        import csv
+        filename = f"roi_feedbacks_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        writer = csv.writer(response)
+        writer.writerow(_FEEDBACK_CSV_HEADERS)
+        for fb in qs.iterator(chunk_size=2000):
+            d = _feedback_to_dict(fb)
+            writer.writerow([d[h] for h in _FEEDBACK_CSV_HEADERS])
+        return response
+
+    if fmt == 'xlsx':
+        from io import BytesIO
+        try:
+            from openpyxl import Workbook
+        except ImportError:
+            return JsonResponse({'error': 'openpyxl is not installed on this server.'}, status=500)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Feedbacks"
+        ws.append(_FEEDBACK_CSV_HEADERS)
+        for fb in qs.iterator(chunk_size=2000):
+            d = _feedback_to_dict(fb)
+            ws.append([d[h] for h in _FEEDBACK_CSV_HEADERS])
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        filename = f"roi_feedbacks_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    page_obj = paginate_feedback(qs, params=params)
+    return JsonResponse({
+        'count': page_obj.paginator.count,
+        'page': page_obj.number,
+        'page_size': params.page_size,
+        'num_pages': page_obj.paginator.num_pages,
+        'has_next': page_obj.has_next(),
+        'has_previous': page_obj.has_previous(),
+        'results': [_feedback_to_dict(fb) for fb in page_obj.object_list],
+    })
 
 
 # @login_required
