@@ -33,20 +33,31 @@
 
  .admin-shell .dashboard-grid {
     display: grid;
-    grid-template-columns: minmax(1, 1fr) 360px;
+    grid-template-columns: 360px minmax(0, 1fr);
     gap: 1.25rem;
     align-items: start;
  }
 
- .admin-shell .dashboard-aside{
+ .admin-shell .dashboard-aside {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 1.25rem;
+    align-self: start;
+ }
+
+ .admin-shell .dashboard-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-width: 0;
  }
 
  @media (max-width: 1024px) {
-    .admin-shell .dashboard-aside{
+    .admin-shell .dashboard-grid {
         grid-template-columns: 1fr;
+    }
+    .admin-shell .dashboard-aside {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
  }
 
@@ -101,7 +112,7 @@
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 1rem;
     margin-top: 1.5rem;
 }
@@ -230,6 +241,9 @@
 @media (max-width: 1024px) {
     .chart-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .chart-card--donut {
+        grid-column: span 2;
     }
 }
 
@@ -673,6 +687,15 @@ tbody tr:hover {
     margin-bottom: 1rem;
 }
 
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .admin-shell .dashboard-aside {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 720px) {
     .admin-shell {
         padding: 1.75rem 1rem 3rem;
@@ -684,5 +707,9 @@ tbody tr:hover {
 
     .panel {
         padding: 1.5rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

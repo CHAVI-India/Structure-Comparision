@@ -175,120 +175,122 @@
             </article>
         </div>
         {% endwith %}
+        <div class="dashboard-main">
+            <section class="panel panel-main">
+                <div class="section-header">
+                    <h2>Recent Assignments</h2>
+                    <a class="alert-row alert-info text-sm" href="{% url 'admin_assignments' %}">View Assignments Page</a>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>Assigned Users</th>
+                                <th>Groups</th>
+                                <th>Review Status</th>
+                                <th>Last Assigned</th>
+                                <th>Pending Age</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in assignment_rows %}
+                            <tr>
+                                <td>
+                                    <strong>{{ row.patient.patient_id }}</strong>
+                                </td>
+                                <td>
+                                    {% if row.usernames %}
+                                    {% for username in row.usernames %}
+                                    <span class="pill">{{ username }}</span>
+                                    {% endfor %}
+                                    {% else %}
+                                    <span class="text-sm text-slate-400">Unassigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.groups %}
+                                    {% for group in row.groups %}
+                                    <span class="pill pill-group">{{ group }}</span>
+                                    {% endfor %}
+                                    {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.review_state == 'Reviewed' %}
+                                    <span class="pill pill-success">Reviewed</span>
+                                    {% else %}
+                                    <span class="pill pill-warn">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.last_assigned %}
+                                    {{ row.last_assigned|date:"M d, Y" }}
+                                    {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.first_assigned %}
+                                    {{ row.first_assigned|timesince }} ago
+                                    {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6">No patients available.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="panel">
+                <div class="section-header">
+                    <h2>Recent Feedback</h2>
+                    <a class="alert-row alert-info text-sm" href="{% url 'admin_feedbacks' %}">View Feedback Page</a>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Patient</th>
+                                <th>ROI</th>
+                                <th>RT1 Label</th>
+                                <th>RT1 Rating</th>
+                                <th>RT2 Label</th>
+                                <th>RT2 Rating</th>
+                                <th>Comment</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for feedback in feedbacks %}
+                            <tr>
+                                    <td>{{ feedback.user.username }}</td>
+                                    <td>{{ feedback.patient.patient_id }}</td>
+                                    <td>{% if feedback.roi %}{{ feedback.roi.roi_label }}{% else %}{{ feedback.common_roi_label|default:"—" }}{% endif %}</td>
+                                    <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
+                                    <td>{{ feedback.rt1_rating|default:"—" }}</td>
+                                    <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
+                                    <td>{{ feedback.rt2_rating|default:"—" }}</td>
+                                    <td>{{ feedback.comment|default:"—" }}</td>
+                                    <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                                </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9">No feedback submitted yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
     </div>
-    <section class="panel panel-main">
-        <div class="section-header">
-            <h2>Recent Assignments</h2>
-            <a class="alert-row alert-info text-sm" href="{% url 'admin_assignments' %}">View Assignments Page</a>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Patient</th>
-                        <th>Assigned Users</th>
-                        <th>Groups</th>
-                        <th>Review Status</th>
-                        <th>Last Assigned</th>
-                        <th>Pending Age</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in assignment_rows %}
-                    <tr>
-                        <td>
-                            <strong>{{ row.patient.patient_id }}</strong>
-                        </td>
-                        <td>
-                            {% if row.usernames %}
-                            {% for username in row.usernames %}
-                            <span class="pill">{{ username }}</span>
-                            {% endfor %}
-                            {% else %}
-                            <span class="text-sm text-slate-400">Unassigned</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if row.groups %}
-                            {% for group in row.groups %}
-                            <span class="pill pill-group">{{ group }}</span>
-                            {% endfor %}
-                            {% else %}
-                            <span class="text-sm text-slate-400">—</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if row.review_state == 'Reviewed' %}
-                            <span class="pill pill-success">Reviewed</span>
-                            {% else %}
-                            <span class="pill pill-warn">Pending</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if row.last_assigned %}
-                            {{ row.last_assigned|date:"M d, Y" }}
-                            {% else %}
-                            <span class="text-sm text-slate-400">—</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if row.first_assigned %}
-                            {{ row.first_assigned|timesince }} ago
-                            {% else %}
-                            <span class="text-sm text-slate-400">—</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6">No patients available.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-    <section class="panel">
-        <div class="section-header">
-            <h2>Recent Feedback</h2>
-            <a class="alert-row alert-info text-sm" href="{% url 'admin_feedbacks' %}">View Feedback Page</a>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Patient</th>
-                        <th>ROI</th>
-                        <th>RT1 Label</th>
-                        <th>RT1 Rating</th>
-                        <th>RT2 Label</th>
-                        <th>RT2 Rating</th>
-                        <th>Comment</th>
-                        <th>Updated</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for feedback in feedbacks %}
-                    <tr>
-                            <td>{{ feedback.user.username }}</td>
-                            <td>{{ feedback.patient.patient_id }}</td>
-                            <td>{% if feedback.roi %}{{ feedback.roi.roi_label }}{% else %}{{ feedback.common_roi_label|default:"—" }}{% endif %}</td>
-                            <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
-                            <td>{{ feedback.rt1_rating|default:"—" }}</td>
-                            <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
-                            <td>{{ feedback.rt2_rating|default:"—" }}</td>
-                            <td>{{ feedback.comment|default:"—" }}</td>
-                            <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
-                        </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="9">No feedback submitted yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
 </div>
 {% endblock %}
