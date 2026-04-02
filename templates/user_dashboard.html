@@ -12,7 +12,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="admin-shell">
+<div class="admin-shell user-shell">
     <section class="hero">
         <h1>My Control Center</h1>
         <p>Track your assignments, review status, and submit feedback for your patients.</p>
@@ -96,90 +96,91 @@
                 {% endif %}
             </article>
         </div>
+        <div class="dashboard-main">
+            <section class="panel panel-main">
+                <div class="section-header">
+                    <h2>My Assigned Patients</h2>
+                    <a class="alert-row alert-info text-sm" href="{% url 'patients' %}">Open Patients Page</a>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>Name</th>
+                                <th>Gender</th>
+                                <th>DOB</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for patient_data in patients|slice:":8" %}
+                            <tr>
+                                <td><strong>{{ patient_data.patient.patient_id }}</strong></td>
+                                <td>{{ patient_data.patient.patient_name|default:"—" }}</td>
+                                <td>{{ patient_data.patient.patient_gender|default:"—" }}</td>
+                                <td>
+                                    {% if patient_data.patient.patient_date_of_birth %}
+                                    {{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}
+                                    {% else %}
+                                    <span class="text-sm text-slate-400">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a class="pill" href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}">View Comparison</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5">No assigned patients yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="section-header">
+                    <h2>Recent Feedback</h2>
+                    <a class="alert-row alert-info text-sm" href="{% url 'my_feedbacks' %}">View All My Feedbacks</a>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>ROI</th>
+                                <th>RT1 Label</th>
+                                <th>RT1 Rating</th>
+                                <th>RT2 Label</th>
+                                <th>RT2 Rating</th>
+                                <th>Comment</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for feedback in recent_feedbacks %}
+                            <tr>
+                                <td>{{ feedback.patient.patient_id }}</td>
+                                <td>{% if feedback.roi %}{{ feedback.roi.roi_label }}{% else %}{{ feedback.common_roi_label|default:"—" }}{% endif %}</td>
+                                <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
+                                <td>{{ feedback.rt1_rating|default:"—" }}</td>
+                                <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
+                                <td>{{ feedback.rt2_rating|default:"—" }}</td>
+                                <td>{{ feedback.comment|default:"—"|truncatechars:60 }}</td>
+                                <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8">No feedback submitted yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
     </div>
-
-    <section class="panel panel-main">
-        <div class="section-header">
-            <h2>My Assigned Patients</h2>
-            <a class="alert-row alert-info text-sm" href="{% url 'patients' %}">Open Patients Page</a>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Patient</th>
-                        <th>Name</th>
-                        <th>Gender</th>
-                        <th>DOB</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for patient_data in patients|slice:":8" %}
-                    <tr>
-                        <td><strong>{{ patient_data.patient.patient_id }}</strong></td>
-                        <td>{{ patient_data.patient.patient_name|default:"—" }}</td>
-                        <td>{{ patient_data.patient.patient_gender|default:"—" }}</td>
-                        <td>
-                            {% if patient_data.patient.patient_date_of_birth %}
-                            {{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}
-                            {% else %}
-                            <span class="text-sm text-slate-400">—</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a class="pill" href="{% url 'dicom_web_viewer_patient' patient_data.patient.id %}">View Comparison</a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5">No assigned patients yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <section class="panel">
-        <div class="section-header">
-            <h2>Recent Feedback</h2>
-            <a class="alert-row alert-info text-sm" href="{% url 'my_feedbacks' %}">View All My Feedbacks</a>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Patient</th>
-                        <th>ROI</th>
-                        <th>RT1 Label</th>
-                        <th>RT1 Rating</th>
-                        <th>RT2 Label</th>
-                        <th>RT2 Rating</th>
-                        <th>Comment</th>
-                        <th>Updated</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for feedback in recent_feedbacks %}
-                    <tr>
-                        <td>{{ feedback.patient.patient_id }}</td>
-                        <td>{% if feedback.roi %}{{ feedback.roi.roi_label }}{% else %}{{ feedback.common_roi_label|default:"—" }}{% endif %}</td>
-                        <td title="{{ feedback.rt1_label|default:'' }}">{{ feedback.rt1_label|default:"—"|truncatechars:30 }}</td>
-                        <td>{{ feedback.rt1_rating|default:"—" }}</td>
-                        <td title="{{ feedback.rt2_label|default:'' }}">{{ feedback.rt2_label|default:"—"|truncatechars:30 }}</td>
-                        <td>{{ feedback.rt2_rating|default:"—" }}</td>
-                        <td>{{ feedback.comment|default:"—"|truncatechars:60 }}</td>
-                        <td>{{ feedback.updated_at|date:"M d, Y H:i" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8">No feedback submitted yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </section>
 </div>
 {% endblock %}
