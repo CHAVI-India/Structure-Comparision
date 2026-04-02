@@ -1068,6 +1068,9 @@ def api_feedbacks(request):
     if err:
         return err
 
+    raw_page_size = request.GET.get('page_size', 'all')
+    paginate = raw_page_size not in ('all', '', None)
+
     params = parse_feedback_list_params(request.GET)
     qs = build_feedback_queryset(scope="admin", user=api_token.user, params=params)
     fmt = (request.GET.get('format') or 'json').lower()
@@ -1107,6 +1110,18 @@ def api_feedbacks(request):
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+
+    if not paginate:
+        results = [_feedback_to_dict(fb) for fb in qs.iterator(chunk_size=2000)]
+        return JsonResponse({
+            'count': len(results),
+            'page': None,
+            'page_size': 'all',
+            'num_pages': None,
+            'has_next': False,
+            'has_previous': False,
+            'results': results,
+        })
 
     page_obj = paginate_feedback(qs, params=params)
     return JsonResponse({
