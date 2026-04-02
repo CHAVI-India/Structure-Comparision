@@ -26,9 +26,9 @@
                     <p class="page-subtitle">Select a patient to compare their structure studies.</p>
                 </div>
                 <div class="header-stats" id="header_stats">
-                    <div class="stat-pill"><strong style="font-size: 1.05rem;">{{ total_patients }}</strong> patients</div>
-                    <div class="stat-pill"><strong style="font-size: 1.05rem;">{{ total_studies }}</strong> studies</div>
-                    <div class="stat-pill"><strong style="font-size: 1.05rem;">{{ total_series }}</strong> series</div>
+                    <div class="stat-pill"><strong>{{ total_patients }}</strong> patients</div>
+                    <div class="stat-pill"><strong>{{ total_studies }}</strong> studies</div>
+                    <div class="stat-pill"><strong>{{ total_series }}</strong> series</div>
                 </div>
             </div>
 
@@ -87,30 +87,22 @@
 
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            {% if patient_data.patient.patient_name %}
-                            <div>
-                                <span>Name:</span>
-                                <span>{{ patient_data.patient.patient_name }}</span>
+                            <div class="patient-meta-inline">
+                                {% if patient_data.patient.patient_gender %}<span><span class="meta-key"><svg viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                            <circle cx="12" cy="7" r="4" />
+                                        </svg>Gender:</span> {{ patient_data.patient.patient_gender }}</span>{% endif %}
+                                {% if patient_data.patient.patient_date_of_birth %}<span><span class="meta-key"><svg viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                        </svg>DOB:</span> {{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}</span>{% endif %}
+                                {% if not patient_data.patient.patient_gender and not patient_data.patient.patient_date_of_birth %}<span
+                                    class="detail-empty">No demographic details available.</span>{% endif %}
                             </div>
-                            {% endif %}
-
-                            {% if patient_data.patient.patient_gender %}
-                            <div>
-                                <span>Gender:</span>
-                                <span>{{ patient_data.patient.patient_gender }}</span>
-                            </div>
-                            {% endif %}
-
-                            {% if patient_data.patient.patient_date_of_birth %}
-                            <div>
-                                <span>DOB:</span>
-                                <span>{{ patient_data.patient.patient_date_of_birth|date:"M d, Y" }}</span>
-                            </div>
-                            {% endif %}
-
-                            {% if not patient_data.patient.patient_name and not patient_data.patient.patient_gender and not patient_data.patient.patient_date_of_birth %}
-                            <div class="detail-empty" style="font-size: 0.9rem; color: var(--muted);">No demographic details available.</div>
-                            {% endif %}
                         </div>
 
                         {% if is_admin %}
@@ -135,17 +127,26 @@
                 </div>
 
                 <div class="patient-roi-stats-row">
-                    <div class="patient-stat-item">
+                    <div class="patient-stat-item patient-stat-item--total">
                         <strong>{{ patient_data.total_common_rois }}</strong>
-                        Total ROIs
+                        <div class="stat-label-row">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                            <span>Total ROIs</span>
+                        </div>
                     </div>
-                    <div class="patient-stat-item">
-                        <strong>{{ patient_data.feedback_roi_count }}</strong>
-                        Feedback ROIs
-                    </div>
-                    <div class="patient-stat-item">
+                    <div class="patient-stat-item patient-stat-item--feedback">
                         <strong>{{ patient_data.pending_roi_count }}</strong>
-                        Pending ROIs
+                        <div class="stat-label-row">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                            <span>Pending ROIs</span>
+                        </div>
+                    </div>
+                    <div class="patient-stat-item patient-stat-item--pending">
+                        <strong>{{ patient_data.feedback_roi_count }}</strong>
+                        <div class="stat-label-row">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span>Feedback ROIs</span>
+                        </div>
                     </div>
                 </div>
 
