@@ -1135,6 +1135,91 @@ def api_feedbacks(request):
     })
 
 
+def _user_details_to_dict(ud):
+    return {
+        'id': str(ud.id),
+        'username': ud.user.username,
+        'email': ud.user.email,
+        'experience_post_md_dnb': ud.experience_post_md_dnb,
+        'specialization_in_breast': ud.specialization_in_breast,
+        'specialization_in_head_neck': ud.specialization_in_head_neck,
+        'routinely_segment_brachial_plexus': ud.routinely_segment_brachial_plexus,
+        'experience_in_autosegmentation': ud.experience_in_autosegmentation,
+        'works_in_teaching_institute': ud.works_in_teaching_institute,
+        'created_at': ud.created_at.isoformat() if ud.created_at else '',
+        'updated_at': ud.updated_at.isoformat() if ud.updated_at else '',
+    }
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_user_details(request):
+    """
+    External REST API – returns all user details.
+
+    Authentication
+    --------------
+    Include in every request:
+        Authorization: Token <your_token>
+
+    Optional query params
+    ---------------------
+    username    filter by username (case-insensitive contains)
+    page        page number (default: 1)
+    page_size   10 | 25 | 50 | 100  (omit or set to 'all' for unpaginated)
+    """
+    api_token, err = _authenticate_api_token(request)
+    if err:
+        return err
+
+    qs = UserDetails.objects.select_related('user').order_by('-created_at')
+
+    username = (request.GET.get('username') or '').strip()
+    if username:
+        qs = qs.filter(user__username__icontains=username)
+
+    raw_page_size = request.GET.get('page_size', 'all')
+    paginate = raw_page_size not in ('all', '', None)
+
+    if not paginate:
+        results = [_user_details_to_dict(ud) for ud in qs.iterator(chunk_size=2000)]
+        return JsonResponse({
+            'count': len(results),
+            'page': None,
+            'page_size': 'all',
+            'num_pages': None,
+            'has_next': False,
+            'has_previous': False,
+            'results': results,
+        })
+
+    try:
+        page_size = int(raw_page_size)
+        if page_size not in {10, 25, 50, 100}:
+            page_size = 25
+    except (TypeError, ValueError):
+        page_size = 25
+
+    try:
+        page = int(request.GET.get('page', 1))
+    except (TypeError, ValueError):
+        page = 1
+
+    from django.core.paginator import Paginator
+    paginator = Paginator(qs, page_size)
+    page_obj = paginator.get_page(page)
+
+    return JsonResponse({
+        'count': paginator.count,
+        'page': page_obj.number,
+        'page_size': page_size,
+        'num_pages': paginator.num_pages,
+        'has_next': page_obj.has_next(),
+        'has_previous': page_obj.has_previous(),
+        'results': [_user_details_to_dict(ud) for ud in page_obj.object_list],
+    })
+
+
 # @login_required
 # @require_http_methods(["GET"])
 # def serve_local_dicom(request, sop_instance_uid):

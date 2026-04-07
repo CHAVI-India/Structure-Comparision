@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.models import User, Group, Permission
-from rtstructcompare.models import Patient, DICOMStudy, DICOMSeries, DICOMInstance, RTStruct, Roi, Feedback
+from rtstructcompare.models import Patient, DICOMStudy, DICOMSeries, DICOMInstance, RTStruct, Roi, Feedback, UserDetails
 
 
 @admin.register(Patient)
@@ -190,7 +190,26 @@ class FeedbackAdmin(admin.ModelAdmin):
     autocomplete_fields = ['user', 'patient', 'roi_rt1', 'roi_rt2']
 
 
+@admin.register(UserDetails)
+class UserDetailsAdmin(admin.ModelAdmin):
+    """Admin interface for UserDetails model"""
+    list_display = ('id', 'user', 'experience_post_md_dnb', 'specialization_in_breast', 'specialization_in_head_neck', 'routinely_segment_brachial_plexus', 'experience_in_autosegmentation', 'works_in_teaching_institute', 'created_at', 'updated_at')
+    list_filter = ('specialization_in_breast', 'specialization_in_head_neck', 'routinely_segment_brachial_plexus', 'experience_in_autosegmentation', 'works_in_teaching_institute', 'created_at', 'updated_at')
+    search_fields = ('user__username',)
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
 
+    fieldsets = (
+        ('User Details', {
+            'fields': ('id', 'user', 'experience_post_md_dnb', 'specialization_in_breast', 'specialization_in_head_neck', 'routinely_segment_brachial_plexus', 'experience_in_autosegmentation', 'works_in_teaching_institute')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    autocomplete_fields = ['user']
 
 
 # Customize admin site header and title
