@@ -46,4 +46,5 @@ urlpatterns = [
     path('api/submit-feedback/', views.submit_feedback, name='submit_feedback'),
     path('api/submit-user-details/', views.submit_user_details, name='submit_user_details'),
     path('api/feedbacks/', views.api_feedbacks, name='api_feedbacks'),
+    path('api/user-details/', views.api_user_details, name='api_user_details'),
 ]
